@@ -59,6 +59,8 @@ import { VsCodeDropdownMenu } from "./VsCodeDropdownMenu";
 import { DownloadDropdownGroup } from "./Share/DownloadDropdownGroup";
 import { GitDropdownGroup } from "./Share/GitDropdownGroup";
 import { EmbedDropdownGroup } from "./Share/EmbedDropdownGroup";
+import { DocumentationDropdownGroup } from "./Share/DocumentationDropdownGroup";
+import { GenerateDocumentationModal } from "./Share/GenerateDocumentationModal";
 import { ActiveWorkspace } from "@kie-tools-core/workspaces-git-fs/dist/model/ActiveWorkspace";
 import { useGitIntegration } from "./GitIntegration/GitIntegrationContextProvider";
 import {
@@ -137,6 +139,25 @@ export function EditorToolbarWithWorkspace(
 
   const { gitConfig } = useAuthSession(props.workspace.descriptor.gitAuthSessionId);
 
+  // State for documentation modal
+  const [isDocumentationModalOpen, setIsDocumentationModalOpen] = useState(false);
+
+  // Documentation generation handlers
+  const handleGenerateAllDocumentation = useCallback(() => {
+    console.log("📄 Generate All DMN Documentation");
+    // TODO: Implement PDF generation for all DMNs
+  }, []);
+
+  const handleGenerateSelectedDocumentation = useCallback(() => {
+    console.log("📄 Opening modal for selected DMN documentation");
+    setIsDocumentationModalOpen(true);
+  }, []);
+
+  const handleCloseDocumentationModal = useCallback(() => {
+    console.log("📄 Closing documentation modal");
+    setIsDocumentationModalOpen(false);
+  }, []);
+
   const shareDropdownItems = useMemo(
     () => [
       <DownloadDropdownGroup
@@ -145,10 +166,24 @@ export function EditorToolbarWithWorkspace(
         workspace={props.workspace}
         key="download-dropdown-group"
       />,
+      <DocumentationDropdownGroup
+        editor={props.editor}
+        workspaceFile={props.workspaceFile}
+        workspace={props.workspace}
+        onGenerateAll={handleGenerateAllDocumentation}
+        onGenerateSelected={handleGenerateSelectedDocumentation}
+        key="documentation-dropdown-group"
+      />,
       <EmbedDropdownGroup workspaceFile={props.workspaceFile} workspace={props.workspace} key="embed-dropdown-group" />,
       <GitDropdownGroup workspace={props.workspace} key="git-dropdown-group" />,
     ],
-    [props.editor, props.workspaceFile, props.workspace]
+    [
+      props.editor,
+      props.workspaceFile,
+      props.workspace,
+      handleGenerateAllDocumentation,
+      handleGenerateSelectedDocumentation,
+    ]
   );
 
   const handleDeletedWorkspaceFile = useCallback(() => {
@@ -494,6 +529,15 @@ export function EditorToolbarWithWorkspace(
         </Flex>
       </PageSection>
       <textarea ref={copyContentTextArea} style={{ height: 0, position: "absolute", zIndex: -1 }} />
+
+      {/* Documentation Modal - Rendered outside dropdown */}
+      <GenerateDocumentationModal
+        isOpen={isDocumentationModalOpen}
+        onClose={handleCloseDocumentationModal}
+        workspaceFile={props.workspaceFile}
+        workspace={props.workspace}
+        editor={props.editor}
+      />
     </>
   );
 }
