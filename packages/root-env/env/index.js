@@ -69,7 +69,7 @@ module.exports = composeEnv([], {
     },
     /* (end) */
     QUARKUS_PLATFORM_version: {
-      default: "3.27.2",
+      default: "3.27.2", // Upgraded for Quarkus 3.27.2 + Spring Boot 3.5.10 alignment
       description: "Quarkus version to be used on dependency declaration.",
     },
     /* (begin) This part of the file is referenced in `scripts/update-kogito-version` */
