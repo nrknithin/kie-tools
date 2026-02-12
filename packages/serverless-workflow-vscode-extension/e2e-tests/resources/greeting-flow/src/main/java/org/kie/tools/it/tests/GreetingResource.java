@@ -19,10 +19,10 @@
 
 package org.kie.tools.it.tests;
 
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.Produces;
-import javax.ws.rs.core.MediaType;
+import jakarta.ws.rs.GET; // Migrated from javax.ws.rs to jakarta.ws.rs for Quarkus 3.x
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
 
 @Path("/hello")
 public class GreetingResource {
