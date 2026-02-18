@@ -158,7 +158,6 @@
               <version>${version.quarkus}</version>
             </path>
           </annotationProcessorPaths>
-          <!-- Removed -AlegacyConfigRoot=true: legacy config classes no longer supported since Quarkus 3.25 -->
         </configuration>
       </plugin>
     </plugins>

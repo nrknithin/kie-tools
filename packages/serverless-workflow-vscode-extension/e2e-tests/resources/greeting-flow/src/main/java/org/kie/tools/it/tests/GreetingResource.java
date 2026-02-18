@@ -19,7 +19,7 @@
 
 package org.kie.tools.it.tests;
 
-import jakarta.ws.rs.GET; // Migrated from javax.ws.rs to jakarta.ws.rs for Quarkus 3.x
+import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;

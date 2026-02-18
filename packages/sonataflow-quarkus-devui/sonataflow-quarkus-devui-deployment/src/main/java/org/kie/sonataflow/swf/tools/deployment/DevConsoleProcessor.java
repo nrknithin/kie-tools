@@ -162,7 +162,7 @@ public class DevConsoleProcessor {
         if (propertyConfig == null) {
             propertyConfig = configurationBuildItem
                     .getReadResult()
-                    .getRunTimeValues() // Renamed from getRunTimeDefaultValues() in Quarkus 3.27 (PR #50745)
+                    .getRunTimeValues()
                     .get(propertyKey);
         }
 
