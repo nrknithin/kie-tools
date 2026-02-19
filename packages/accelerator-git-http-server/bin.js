@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,29 +19,4 @@
  * under the License.
  */
 
-import path from "path";
-import { readFile } from "fs/promises";
-import { Page } from "@playwright/test";
-import { prettierFormat } from "./prettier";
-
-export enum ExternalFile {
-  EMPTY_DRD = "files/empty-drd.dmn",
-  EMPTY_DMN = "files/empty.dmn",
-  LOAN_PRE_QUALIFICATION_DMN = "files/loan-pre-qualification.dmn",
-  CAN_DRIVE_DMN = "files/can-drive.dmn",
-  FIND_EMPLOYEES_DMN = "files/find-employees.dmn",
-  TYPES_DMN = "files/types.dmn",
-  SCORECARD_PMML = "files/scorecard.pmml",
-}
-
-export class Files {
-  constructor(public page: Page) {}
-
-  public async getFile(filename: ExternalFile) {
-    return readFile(path.join(__dirname, filename), "utf8");
-  }
-
-  public async getFormattedFile(filename: ExternalFile) {
-    return prettierFormat(await this.getFile(filename));
-  }
-}
+require("./dist/index");
