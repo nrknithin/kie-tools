@@ -2,6 +2,10 @@
 
 Everything below was confirmed by reading the actual files, not assumed. If something you need isn't covered here, go read the analogous file in `dmn-editor` or `bpmn-editor` before inventing a pattern — those two are the most complete examples.
 
+## Workspace layout is read from `pnpm-workspace.yaml`, not hardcoded
+
+This upstream checkout's `pnpm-workspace.yaml` globs `packages/*`, `examples/*`, and `scripts/*`. Downstream forks (e.g. internal BAMOE forks) may add more, such as `packages-bamoe/*` or `packages-bamoe-artifacts/*`. Never hardcode the list of workspace directories — the guardrail scripts in `scripts/lib/workspace.js` parse the `packages:` block of `pnpm-workspace.yaml` directly, so they automatically cover whatever directories that particular checkout actually declares. If you ever reason about "the packages/examples dirs" by hand instead of via the scripts, re-read `pnpm-workspace.yaml` first — don't assume only `packages/` and `examples/` exist.
+
 ## Which packages have Playwright today
 
 Exactly seven `playwright.config.ts` files exist in the repo, all under `packages/` (none under `examples/`):
@@ -105,7 +109,7 @@ export { expect } from "@playwright/test";
 ### Spec file pattern
 
 ```ts
-/* <license header, see assets/license-header.txt — verbatim, CI's Apache RAT check enforces it> */
+/* <license header for this file's workspace group — see "License header" section below> */
 
 import { TestAnnotations } from "@kie-tools/playwright-base/annotations"; // only if pinning a regression
 import { test, expect } from "../__fixtures__/base";
@@ -150,7 +154,9 @@ Every package's `lint` script is scoped to `./src` only (`kie-tools--eslint ./sr
 
 ## License header
 
-CI enforces Apache RAT license-header checks on every source file, `tests-e2e/**/*.ts` included. Always prepend the exact header in `assets/license-header.txt` to every new `.ts` file (config, fixture, or spec).
+CI enforces Apache RAT license-header checks on every source file under the upstream `packages/`, `examples/`, `scripts/` trees, `tests-e2e/**/*.ts` included — always prepend the exact header from `assets/.apache-header` to every new `.ts` file there (config, fixture, or spec).
+
+Two downstream-only workspace groups, `packages-bamoe/*` and `packages-bamoe-artifacts/*`, use a **different** header (not Apache ASF) — its exact text lives in `assets/.ibm-header`. That file ships as a placeholder sentinel until someone pastes the real text in; never assume it's the same as the Apache header, and never fabricate downstream license/compliance text. Run `scripts/check-license-header.js` against any file you touch — it picks the right header per-group automatically and reports files in an unconfigured group as "unconfigured" (exit code 3) rather than silently passing or failing them against the wrong text.
 
 ## No pre-existing plan-doc convention
 

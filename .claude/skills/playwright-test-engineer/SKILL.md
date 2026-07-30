@@ -19,22 +19,42 @@ Other hard constraints, active during every step:
 4. **Existing conventions win** — file naming, folder layout, license headers, fixture composition, config inheritance: copy what the repo does (see `references/repo-conventions.md`), don't improve on it uninvited.
 5. **Confirmation gates** — never write test files before the plan is confirmed; never treat silence as confirmation. The gates are marked ⛔ below.
 
+## Guardrail scripts — run them, don't just reason about them
+
+`scripts/` (Node.js, zero npm dependencies, no shell scripts — runs the same on Windows/macOS/Linux) contains deterministic checks that back the hard constraints above. They exist because self-assessment of things like "is this import real" or "does this path exist" is exactly the kind of claim a model can get wrong with full confidence — a script that actually reads the filesystem cannot. Treat every 🔧 marker below as **required**, not optional:
+
+- `scripts/list-target-packages.js` — Step 1's package list and existence check.
+- `scripts/check-imports.js <files...>` — resolves every import against real files/declared deps. This is constraint #3, mechanically enforced.
+- `scripts/check-license-header.js <files...>` — verifies the exact, group-correct header is present (exit 0 pass, 1 fail, 3 "header not configured yet for this group").
+- `scripts/check-fixture-wiring.js <package>` — flags fixtures a spec destructures that were never declared in `__fixtures__/base.ts`.
+- `scripts/check-spec-conventions.js <package>` — naming, anti-patterns (`waitForTimeout`, raw selectors), screenshot naming/coverage heuristics.
+- `scripts/verify-plan-paths.js <plan.md> <package>` — every `**Covers**:`/`**File**:`/`**Fixtures/utilities used**:` path in a plan is checked against the real filesystem.
+- `scripts/verify-e2e-discovery.js <package>` — hands specs to Playwright's own `test --list` loader (needs `pnpm install` done first); the strongest check available, since it's the same resolution path CI uses, not an approximation of it.
+- `scripts/run-all-checks.js <package> [--plan <path>] [--with-playwright-list]` — runs all of the above together and gives one pass/fail verdict. This is the one to call at Step 7a.
+
+None of these replace your judgment on *what* to test or *why* a test matters — they only verify the mechanical facts (existence, naming, wiring) that judgment alone tends to get wrong under confidence. Read a script's output; don't just trust that it ran.
+
 ## Interactive flow
 
 The skill runs two mutually exclusive modes — **Create/Update** and **Evaluate** — selected in Step 3. Steps 1–3 are always the same.
 
 ### Step 1 — Package selection
 
-Immediately ask which package to work on. Build the list by scanning, in this order of usefulness:
+Immediately ask which package to work on. 🔧 Build the list by running:
 
 ```bash
-# Packages that already have Playwright tests (fast path, present these first)
-ls packages/*/playwright.config.ts
-# All workspace packages (in case the user wants to add Playwright to a new one)
-ls packages/ examples/
+node .claude/skills/playwright-test-engineer/scripts/list-target-packages.js
 ```
 
-Present the Playwright-enabled packages as a numbered list (as of last analysis: `boxed-expression-component`, `bpmn-editor`, `dmn-editor`, `dmn-editor-standalone`, `online-editor`, `scesim-editor`, plus the shared infra package `playwright-base`) and mention that any other `packages/*` or `examples/*` directory can also be chosen if they want to introduce tests there. Accept selection by number or name. Do not proceed until you have a valid, existing package. Note: nothing under `examples/` currently has Playwright tests — choosing one means bootstrapping from scratch, which is fine, but say so.
+This returns the real, current `withPlaywright` list (present these first) and the full `all` list across every workspace group in `pnpm-workspace.yaml` (`packages/`, `examples/`, `scripts/`, and any downstream-only groups like `packages-bamoe/`, `packages-bamoe-artifacts/` — don't hardcode this list from memory, it drifts). Present the Playwright-enabled packages as a numbered list, and mention any other package can be chosen to bootstrap Playwright from scratch. Accept selection by number or name.
+
+🔧 Once the user answers, confirm it's real before proceeding — don't just trust the name matches something you recall:
+
+```bash
+node .claude/skills/playwright-test-engineer/scripts/list-target-packages.js --check "<user's answer>"
+```
+
+Exit 0 means it resolved to a real package (the JSON tells you its group and whether it already has a `playwright.config.ts`). Exit 1 means it didn't — show the `didYouMean` suggestions from the output and ask again. Do not proceed on a package you haven't verified this way.
 
 ### Step 2 — Package analysis (silent)
 
@@ -68,16 +88,29 @@ Ask: will the user provide test scenarios, or should you generate them from the 
 
 Generate a `TEST_PLAN.md` for the target package using `assets/TEST_PLAN-template.md`. The repo has no pre-existing plan-file convention, so this template *is* the convention — keep it. For every scenario include: name + description; the source feature/code path covered (real file paths); testing approach (all Playwright tests in this repo are E2E against a storybook iframe or a served app — say which, and whether the scenario needs a screenshot assertion); fixtures/utilities/configs used (only ones that exist or that you will create); expected assertions and acceptance criteria; prerequisite state or data setup.
 
+Before showing the plan to the user, 🔧 verify it yourself:
+
+```bash
+node .claude/skills/playwright-test-engineer/scripts/verify-plan-paths.js <TEST_PLAN.md path> <package>
+```
+
+Every `**Covers**:` path is a hard failure if it doesn't resolve to real source — fix the plan (not the script) before showing it. `**File**:`/`**Fixtures/utilities used**:` entries that don't exist yet are reported as notes, not failures — that's expected for things Step 7a will create. Only present a plan to the user once this comes back clean (no `problems`).
+
 Show the full plan content in the conversation and wait for explicit confirmation **before writing the file to disk or writing any test code**. `TEST_PLAN.md` is a working document — ask the user whether they want it committed or kept local (it is not a repo convention, so default to not committing it).
 
 ### Step 7a — Implementation
 
 Only after plan confirmation:
 
-- Implement every confirmed scenario. Follow `references/repo-conventions.md` exactly: Apache license header (verbatim from `assets/license-header.txt` — CI's Apache RAT check fails without it), `tests-e2e/<featureGroup>/<camelCaseName>.spec.ts` naming, `import { test, expect } from "../__fixtures__/base"`, page-object fixtures, `TestAnnotations` for regression/workaround links, `toHaveScreenshot("kebab-case-name.png")` for visual assertions.
+- Implement every confirmed scenario. Follow `references/repo-conventions.md` exactly: correct license header for the package's workspace group (`assets/.apache-header` for `packages/`, `examples/`, `scripts/`; `assets/.ibm-header` for `packages-bamoe/`, `packages-bamoe-artifacts/`), `tests-e2e/<featureGroup>/<camelCaseName>.spec.ts` naming, `import { test, expect } from "../__fixtures__/base"`, page-object fixtures, `TestAnnotations` for regression/workaround links, `toHaveScreenshot("kebab-case-name.png")` for visual assertions.
 - Reuse existing fixtures and the merged base config; never duplicate infrastructure. New page objects go in `__fixtures__/` and get wired into `base.ts` via `test.extend`.
-- Every test must run via the package's existing `pnpm` scripts. Sanity-check at minimum with `pnpm exec playwright test --list` from the package dir (full runs need the dev server; note that screenshot baselines are generated in the containerized run on CI, so a locally-failing screenshot diff is expected — tell the user).
-- Finish with a summary table mapping every file created/modified to the scenario(s) it covers.
+- 🔧 Before presenting anything as done, run:
+  ```bash
+  node .claude/skills/playwright-test-engineer/scripts/run-all-checks.js <package>
+  ```
+  This is not optional and not a formality — it re-verifies imports, license headers, fixture wiring, and spec conventions against the actual files you just wrote, the same way it would for someone else's code. A non-zero exit means real problems were found (printed in the JSON); fix them and re-run before telling the user it's done. If `pnpm install` has been run in this environment, also pass `--with-playwright-list` for the strongest check (Playwright's own test loader). If any `packages-bamoe`/`packages-bamoe-artifacts` files came back "unconfigured" for license headers, say so explicitly — don't silently treat that as a pass.
+- Every test must run via the package's existing `pnpm` scripts (full runs need the dev server; screenshot baselines are generated in the containerized run on CI, so a locally-failing screenshot diff is expected — tell the user).
+- Finish with a summary table mapping every file created/modified to the scenario(s) it covers, and include the final `run-all-checks.js` verdict.
 
 ---
 
@@ -85,12 +118,19 @@ Only after plan confirmation:
 
 ### Step 4b — Evaluation
 
-Work through `references/evaluation-checklist.md` against every spec and fixture in the package, and produce a report with exactly these sections:
+🔧 Start by running the deterministic checks — they are the factual backbone of sections 2 and 3 below, not a replacement for reading the tests yourself:
+
+```bash
+node .claude/skills/playwright-test-engineer/scripts/check-spec-conventions.js <package>
+node .claude/skills/playwright-test-engineer/scripts/check-fixture-wiring.js <package>
+```
+
+Then work through `references/evaluation-checklist.md` against every spec and fixture in the package, and produce a report with exactly these sections:
 
 1. **Coverage map** — source features/files vs. the specs that exercise them; explicitly list what is uncovered.
-2. **Test quality** — assertion strength, selector stability (prefer role/testid over CSS/xpath), `waitForTimeout`/hardcoded-timeout anti-patterns, missing error-state coverage.
-3. **Fixture & config hygiene** — correct use of `__fixtures__/base.ts` composition, config properly merged from `@kie-tools/playwright-base`, duplicated setup that belongs in a fixture.
-4. **Flakiness risk** — tests likely to flake and *why* (position-based clicks, screenshot diffs across browsers, race-prone waits, order dependence).
+2. **Test quality** — start from `check-spec-conventions.js`'s findings (naming, `waitForTimeout`, raw selectors, screenshot naming, screenshot-only tests) and add your own read on assertion strength and missing error-state coverage. Don't re-derive by eye what the script already found mechanically — cite its findings, then add the judgment layer (why it matters, how bad it is here).
+3. **Fixture & config hygiene** — start from `check-fixture-wiring.js`'s `undeclaredUsages` (a hard problem — a spec using a fixture that doesn't exist) and `orphanedFixtureFiles` (a lead to check, since legitimate cross-package/composed usage can look orphaned). Add your own read on config merge correctness and duplicated setup.
+4. **Flakiness risk** — tests likely to flake and *why* (position-based clicks, screenshot diffs across browsers, race-prone waits, order dependence). This section is judgment — the scripts don't run tests repeatedly to detect actual flakiness, they only flag static anti-patterns that correlate with it.
 5. **Missing scenarios** — important untested scenarios derived from the source analysis.
 6. **Recommendations** — prioritised (high/medium/low), each actionable and tied to a specific file.
 
@@ -102,6 +142,7 @@ Present the report, then ask ⛔ whether the user wants to switch to Mode 1 to a
 
 - `references/repo-conventions.md` — the discovered, verified Playwright conventions of this monorepo (config inheritance, fixture pattern, naming, scripts, env vars, containerization). **Read before writing or judging any test.**
 - `references/evaluation-checklist.md` — the concrete checklist behind the Mode 2 report.
-- `assets/license-header.txt` — the exact Apache license header every generated `.ts` file must start with.
+- `assets/.apache-header` / `assets/.ibm-header` — the exact license headers for the upstream (ASF) and downstream-only (`packages-bamoe`/`packages-bamoe-artifacts`) workspace groups respectively. `.ibm-header` is a placeholder until the real text is pasted in — `scripts/check-license-header.js` reports files needing it as "unconfigured", never as a false pass.
 - `assets/spec-template.ts` — a skeleton spec file matching repo conventions.
 - `assets/TEST_PLAN-template.md` — the plan-file structure for Step 6a.
+- `scripts/*.js` — the deterministic guardrail checks listed above under "Guardrail scripts". Node.js only, zero npm dependencies, no shell scripts (Windows-safe). Run with plain `node <script>.js <args>`; see each file's header comment for exact usage.
