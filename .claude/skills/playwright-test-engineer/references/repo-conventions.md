@@ -2,13 +2,13 @@
 
 Everything below was confirmed by reading the actual files, not assumed. If something you need isn't covered here, go read the analogous file in `dmn-editor` or `bpmn-editor` before inventing a pattern — those two are the most complete examples.
 
-## Workspace layout is read from `pnpm-workspace.yaml`, not hardcoded
+## Workspace groups this skill scans
 
-This upstream checkout's `pnpm-workspace.yaml` globs `packages/*`, `examples/*`, and `scripts/*`. Downstream forks (e.g. internal BAMOE forks) may add more, such as `packages-bamoe/*` or `packages-bamoe-artifacts/*`. Never hardcode the list of workspace directories — the guardrail scripts in `scripts/lib/workspace.js` parse the `packages:` block of `pnpm-workspace.yaml` directly, so they automatically cover whatever directories that particular checkout actually declares. If you ever reason about "the packages/examples dirs" by hand instead of via the scripts, re-read `pnpm-workspace.yaml` first — don't assume only `packages/` and `examples/` exist.
+`scripts/lib/workspace.js`'s `WORKSPACE_GLOB_DIRS` is a hardcoded list: `packages`, `packages-bamoe`, `packages-bamoe-artifacts`. This upstream checkout's `pnpm-workspace.yaml` also globs `examples/*` and the top-level `scripts/*`, but neither is scanned — Playwright has zero usage under `examples/` (verified: no `playwright.config*` or `tests-e2e/` anywhere under it) and never will (it's example integration snippets), and the top-level `scripts/*` group is build tooling (`run-script-if`, etc.), never a Playwright target. If a downstream fork ever needs another group scanned, add it to that constant directly — this is an intentionally hardcoded list, not parsed from `pnpm-workspace.yaml` at runtime.
 
 ## Which packages have Playwright today
 
-Exactly seven `playwright.config.ts` files exist in the repo, all under `packages/` (none under `examples/`):
+Exactly seven `playwright.config.ts` files exist in the repo, all under `packages/`:
 
 - `packages/playwright-base` — the shared base itself, not a test target.
 - `packages/boxed-expression-component`
@@ -44,7 +44,7 @@ Two shapes exist for `webServer`, pick based on how the target package runs:
 - **Storybook-driven editors** (`boxed-expression-component`, `bpmn-editor`, `dmn-editor`, `dmn-editor-standalone`, `scesim-editor`): a single `webServer` object pointing at a storybook `iframe.html?...&viewMode=story` URL, `command: "pnpm start"`.
 - **Full application** (`online-editor`): `webServer` is an **array** of multiple servers that must all come up (cors-proxy, extended-services, accelerator quarkus, the app itself), plus `use: { viewport: {1600,1200}, ignoreHTTPSErrors: true }`. Use this shape only if the target package is a standalone app, not a component/editor served by storybook.
 
-If the selected package has no `playwright.config.ts` yet (bootstrap case, e.g. an `examples/*` app), copy the shape from the closest analogue (storybook-driven vs. full-app) rather than writing one from scratch.
+If the selected package has no `playwright.config.ts` yet (bootstrap case), run `scripts/scaffold-package-e2e.js` rather than writing one from scratch by hand — it picks the storybook-driven shape by default, or the full-app array shape with `--served-app`.
 
 ## `packages/playwright-base` — the shared base
 
@@ -161,14 +161,10 @@ Every package's `lint` script is scoped to `./src` only (`kie-tools--eslint ./sr
 
 ## License header
 
-CI enforces Apache RAT license-header checks on every source file under the upstream `packages/`, `examples/`, `scripts/` trees, `tests-e2e/**/*.ts` included — always prepend the exact header from `assets/.apache-header` to every new `.ts` file there (config, fixture, or spec).
+CI enforces Apache RAT license-header checks on every source file under `packages/`, `tests-e2e/**/*.ts` included — always prepend the exact header from `assets/.apache-header` to every new `.ts` file there (config, fixture, or spec).
 
 Two downstream-only workspace groups, `packages-bamoe/*` and `packages-bamoe-artifacts/*`, use a **different** header (not Apache ASF) — its exact text lives in `assets/.ibm-header`. That file ships as a placeholder sentinel until someone pastes the real text in; never assume it's the same as the Apache header, and never fabricate downstream license/compliance text. Run `scripts/check-license-header.js` against any file you touch — it picks the right header per-group automatically and reports files in an unconfigured group as "unconfigured" (exit code 3) rather than silently passing or failing them against the wrong text.
 
 ## No pre-existing plan-doc convention
 
 There is no `TEST_PLAN.md`/`PLAN.md` anywhere in the repo today, and `CONTRIBUTING.md`'s Testing section only points to `tests-e2e/`/`test/` and `packages/playwright-base/README.md` — it does not define a plan-file format. `assets/TEST_PLAN-template.md` in this skill is therefore the convention to use; it isn't lifted from an existing repo file.
-
-## `examples/` has zero Playwright today
-
-If the user picks an `examples/*` app, there is nothing to "match" inside that directory — bootstrap it using the closest `packages/` analogue (storybook-driven vs. full-app, per the `webServer` shapes above) and say explicitly that you're introducing Playwright to this app for the first time.

@@ -5,7 +5,7 @@
  *
  * For every given .ts file, extracts every import/require specifier and resolves it:
  *   - relative ("./x", "../x")        -> must exist on disk
- *   - workspace package ("@kie-tools/...", "@kie-tools-core/...", "@kie-tools-examples/...")
+ *   - workspace package ("@kie-tools/...", "@kie-tools-core/...")
  *                                     -> must resolve to a real file inside that package, OR be a
  *                                        dist/ (compiled-output) path — reported separately as
  *                                        "requiresBuild" since it can't be verified without that

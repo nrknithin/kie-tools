@@ -2,12 +2,15 @@
 "use strict";
 /**
  * Step 1 guardrail: produce the package list from the filesystem, not from memory/guessing.
+ * Scoped to packages/, packages-bamoe/, and packages-bamoe-artifacts/ — Playwright is never
+ * used under examples/ or the top-level scripts/ workspace group (verified, not assumed; see
+ * lib/workspace.js's WORKSPACE_GLOB_DIRS comment), so neither is scanned here.
  *
  * Usage:
  *   node list-target-packages.js                 # JSON: { withPlaywright: [...], all: [...] }
  *   node list-target-packages.js --check <name>   # exit 0 + print resolved dir if <name> is a
- *                                                  # real package/example folder or workspace
- *                                                  # package name; exit 1 + suggestions if not.
+ *                                                  # real package folder or workspace package
+ *                                                  # name; exit 1 + suggestions if not.
  */
 
 const path = require("path");
@@ -31,7 +34,7 @@ function main() {
     return;
   }
 
-  const all = listWorkspacePackages(repoRoot).filter((p) => p.group !== "scripts");
+  const all = listWorkspacePackages(repoRoot);
   const withPlaywright = listPlaywrightPackages(repoRoot);
 
   const result = {
@@ -43,7 +46,7 @@ function main() {
 }
 
 function checkPackage(repoRoot, query) {
-  const all = listWorkspacePackages(repoRoot).filter((p) => p.group !== "scripts");
+  const all = listWorkspacePackages(repoRoot);
   const match = all.find((p) => p.name === query || p.folder === query || p.dir === path.resolve(query));
 
   if (match) {
@@ -70,7 +73,7 @@ function checkPackage(repoRoot, query) {
       {
         found: false,
         query,
-        message: `"${query}" is not a package folder name or package.json "name" under packages/ or examples/.`,
+        message: `"${query}" is not a package folder name or package.json "name" under packages/, packages-bamoe/, or packages-bamoe-artifacts/.`,
         didYouMean: all
           .map((p) => p.folder)
           .filter((f) => f.toLowerCase().includes(query.toLowerCase()) || query.toLowerCase().includes(f.toLowerCase()))

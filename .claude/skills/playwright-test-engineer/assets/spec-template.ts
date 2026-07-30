@@ -22,8 +22,8 @@
 //  - only import fixtures that actually exist in ../__fixtures__/base — do not invent fixture names
 //  - only import TestAnnotations if this spec pins a known regression/workaround
 //  - path depth of "../__fixtures__/base" must match this file's actual folder depth under tests-e2e/
-//  - the license header above is assets/.apache-header, correct ONLY for packages/, examples/,
-//    scripts/. If scaffolding into packages-bamoe/ or packages-bamoe-artifacts/, replace it with
+//  - the license header above is assets/.apache-header, correct ONLY for packages/. If
+//    scaffolding into packages-bamoe/ or packages-bamoe-artifacts/, replace it with
 //    assets/.ibm-header instead — never copy this file's header verbatim without checking the
 //    target package's workspace group first. Prefer scripts/scaffold-spec.js, which computes the
 //    correct header and the "../__fixtures__/base" import depth for you instead of manual copying.
@@ -37,22 +37,20 @@ test.beforeEach(async ({ editor }) => {
 
 test.describe("<Feature under test>", () => {
   test.describe("<Sub-scenario grouping>", () => {
-    test("should <expected behavior, plain language>", async ({ /* <fixtures used, e.g. diagram, nodes, palette> */ }) => {
+    test("should <expected behavior, plain language>", async ({
+      /* <fixtures used, e.g. diagram, nodes, palette> */
+    }) => {
       // Optional — only when this test pins a known issue:
       // test.info().annotations.push({
       //   type: TestAnnotations.REGRESSION,
       //   description: "https://github.com/apache/incubator-kie-issues/issues/<NUMBER>",
       // });
-
       // Act: drive the UI through the page-object fixtures, not raw locators.
       // await palette.dragNewNode({ type: NodeType.<X>, targetPosition: { x: 100, y: 100 } });
-
       // Assert: functional assertion(s) first...
       // await expect(nodes.get({ name: "<expected node name>" })).toBeAttached();
-
       // ...then, if the scenario is visual, a screenshot assertion:
       // await expect(diagram.get()).toHaveScreenshot("<kebab-case-scenario-name>.png");
-
       // ...and, where the package exposes a model fixture, assert the underlying
       // model (XML/JSON) changed as expected — not just the DOM:
       // const element = await jsonModel.drgElements.get<...>({ ... });

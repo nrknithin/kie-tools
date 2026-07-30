@@ -11,11 +11,11 @@ Every package here pins the exact same Playwright version (`@playwright/test@1.4
 
 ## Scope guard — enforce before anything else
 
-This skill operates strictly inside this pnpm monorepo (the repo root containing `pnpm-workspace.yaml` and whatever workspace groups it globs — `packages/`, `examples/`, `scripts/`, and on some downstream forks also `packages-bamoe/`/`packages-bamoe-artifacts/`; run `scripts/list-target-packages.js` rather than assuming only `packages/`/`examples/` exist). If the user asks for Playwright work on a project outside this repo, a generic Playwright tutorial, or tests for code that does not live here, politely refuse and redirect: explain this skill is scoped to this monorepo and offer to help with a package inside it instead. Never create, reference, or suggest files outside the repo root.
+This skill operates strictly inside this pnpm monorepo, and only within `packages/` (plus, on some downstream forks, `packages-bamoe/`/`packages-bamoe-artifacts/`) — Playwright has zero usage anywhere under `examples/` or the top-level `scripts/` workspace group (verified, not assumed) and isn't a fit for either, so neither is ever a valid target. Run `scripts/list-target-packages.js` rather than assuming from memory which packages exist. If the user asks for Playwright work on a project outside this repo, on `examples/`/`scripts/`, a generic Playwright tutorial, or tests for code that does not live here, politely refuse and redirect: explain this skill is scoped to `packages/` (and downstream-only `packages-bamoe*` groups) in this monorepo and offer to help with a package inside that scope instead. Never create, reference, or suggest files outside the repo root.
 
 Other hard constraints, active during every step:
 
-1. **Package validation** — before doing anything with a user-named package, verify the directory actually exists in one of the repo's workspace groups (see `scripts/list-target-packages.js`, not just `packages/`/`examples/`). If it doesn't, show the valid candidates and ask again.
+1. **Package validation** — before doing anything with a user-named package, verify the directory actually exists under `packages/` (or a downstream `packages-bamoe*` group) via `scripts/list-target-packages.js`. If it doesn't, show the valid candidates and ask again.
 2. **pnpm only** — every package-manager command is `pnpm` (this is a pnpm workspace; `npm`/`yarn` will corrupt it). Run tests with the package's existing scripts (`pnpm test-e2e:run` etc.), never ad-hoc `npx playwright test` unless no script exists.
 3. **No hallucinated imports** — every import, fixture, utility, and config reference in generated code must point to a file you have actually seen during analysis. If you need a fixture that doesn't exist, create it following the `__fixtures__` page-object pattern and say so.
 4. **Existing conventions win** — file naming, folder layout, license headers, fixture composition, config inheritance: copy what the repo does (see `references/repo-conventions.md`), don't improve on it uninvited.
@@ -27,6 +27,8 @@ Other hard constraints, active during every step:
 
 - `scripts/list-target-packages.js` — Step 1's package list and existence check.
 - `scripts/inspect-package.js <package>` — Step 2's factual backbone: `package.json` scripts/deps, `playwright.config.ts` shape, `tests-e2e/` inventory (spec/fixture/screenshot counts, feature-group folders), and every cross-package workspace import actually found in `tests-e2e/`. Run this instead of manually reading and summarizing those files by eye.
+- `scripts/scaffold-package-e2e.js <package> [--served-app] [--port <PORT>]` — bootstraps `env/index.js`/`playwright.config.ts`/`tests-e2e/__fixtures__/base.ts` plus additive `package.json` script/devDependency additions for a package that has no Playwright yet. Use this at Step 1 instead of re-synthesizing ~150 lines of config from memory.
+- `scripts/scaffold-spec.js <package> <relPath.spec.ts> [--force]` — generates a new spec file with the correct license header and `../__fixtures__/base` import depth already computed. Use this at Step 7a instead of hand-copying `assets/spec-template.ts` and counting directories.
 - `scripts/check-imports.js <files...>` — resolves every import against real files/declared deps. This is constraint #3, mechanically enforced.
 - `scripts/check-license-header.js <files...>` — verifies the exact, group-correct header is present (exit 0 pass, 1 fail, 3 "header not configured yet for this group").
 - `scripts/check-fixture-wiring.js <package>` — flags fixtures a spec destructures that were never declared in `__fixtures__/base.ts`.
@@ -37,6 +39,7 @@ Other hard constraints, active during every step:
 - `scripts/verify-plan-paths.js <plan.md> <package>` — every `**Covers**:`/`**File**:`/`**Fixtures/utilities used**:` path in a plan is checked against the real filesystem.
 - `scripts/verify-e2e-discovery.js <package>` — hands specs to Playwright's own `test --list` loader (needs `pnpm install` done first); the strongest check available, since it's the same resolution path CI uses, not an approximation of it.
 - `scripts/run-all-checks.js <package> [--plan <path>] [--with-playwright-list]` — runs imports/headers/fixtures/config/conventions together and gives one pass/fail verdict. This is the one to call at Step 7a.
+- `scripts/selftest.js` — regression test for `lib/workspace.js` itself, encoding every resolver bug found during this skill's development (dist/ imports, Node builtins, Playwright's `channel` fixture, etc.). Run it after modifying anything under `scripts/lib/` — it's the only thing that would catch a regression there; nothing else will.
 
 None of these replace your judgment on _what_ to test or _why_ a test matters — they only verify the mechanical facts (existence, naming, wiring) that judgment alone tends to get wrong under confidence. Read a script's output; don't just trust that it ran.
 
@@ -52,7 +55,15 @@ Immediately ask which package to work on. 🔧 Build the list by running:
 node .claude/skills/playwright-test-engineer/scripts/list-target-packages.js
 ```
 
-This returns the real, current `withPlaywright` list (present these first) and the full `all` list across every workspace group in `pnpm-workspace.yaml` (`packages/`, `examples/`, `scripts/`, and any downstream-only groups like `packages-bamoe/`, `packages-bamoe-artifacts/` — don't hardcode this list from memory, it drifts). Present the Playwright-enabled packages as a numbered list, and mention any other package can be chosen to bootstrap Playwright from scratch. Accept selection by number or name.
+This returns the real, current `withPlaywright` list (present these first) and the full `all` list across `packages/` and any downstream-only `packages-bamoe*` groups (don't hardcode this list from memory, it drifts) — `examples/` and the top-level `scripts/` workspace group are intentionally excluded, since Playwright has no usage there and never will. Present the Playwright-enabled packages as a numbered list, and mention any other package in that scope can be chosen to bootstrap Playwright from scratch. Accept selection by number or name.
+
+🔧 If the chosen package has no `playwright.config.ts` yet, bootstrap it with:
+
+```bash
+node .claude/skills/playwright-test-engineer/scripts/scaffold-package-e2e.js <package> [--served-app] [--port <PORT>]
+```
+
+This generates `env/index.js`, `playwright.config.ts` (single-storybook shape by default; pass `--served-app` for a multi-webServer skeleton like `online-editor`'s), and `tests-e2e/__fixtures__/base.ts`, and additively merges the standard `test-e2e*` scripts/devDependencies into `package.json` — all copied from this repo's own established pattern, not re-synthesized from memory. It never overwrites an existing file and auto-suggests a free storybook port by scanning every other package's `env/index.js`. Read its `manualStepsRemaining` output: a storybook-shape bootstrap needs at least one real story authored before the placeholder story id can be replaced, and a served-app bootstrap needs its webServer skeleton filled in with the app's actual dev servers — neither of those can be invented, only flagged.
 
 🔧 Once the user answers, confirm it's real before proceeding — don't just trust the name matches something you recall:
 
@@ -122,7 +133,8 @@ Show the full plan content in the conversation and wait for explicit confirmatio
 
 Only after plan confirmation:
 
-- Implement every confirmed scenario. Follow `references/repo-conventions.md` exactly: correct license header for the package's workspace group (`assets/.apache-header` for `packages/`, `examples/`, `scripts/`; `assets/.ibm-header` for `packages-bamoe/`, `packages-bamoe-artifacts/`), `tests-e2e/<featureGroup>/<camelCaseName>.spec.ts` naming, `import { test, expect } from "../__fixtures__/base"`, page-object fixtures, `TestAnnotations` for regression/workaround links, `toHaveScreenshot("kebab-case-name.png")` for visual assertions.
+- 🔧 For each new spec file, start by running `node .claude/skills/playwright-test-engineer/scripts/scaffold-spec.js <package> <featureGroup>/<camelCaseName>.spec.ts` — it computes the correct license header for the target's workspace group and the correct `../__fixtures__/base` import depth for you (both are pure lookups/arithmetic, not judgment calls, so don't hand-derive them). It refuses to overwrite an existing file without `--force` and refuses to scaffold into a group whose header isn't configured yet. It only writes structural boilerplate with `<placeholder>` markers — fill those in yourself per the confirmed plan.
+- Otherwise follow `references/repo-conventions.md` exactly: `tests-e2e/<featureGroup>/<camelCaseName>.spec.ts` naming, page-object fixtures, `TestAnnotations` for regression/workaround links, `toHaveScreenshot("kebab-case-name.png")` for visual assertions.
 - Reuse existing fixtures and the merged base config; never duplicate infrastructure. New page objects go in `__fixtures__/` and get wired into `base.ts` via `test.extend`.
 - Locator priority follows Playwright's own v1.45.2 guidance (`references/playwright-version-notes.md`): `getByRole` → `getByText` → `getByLabel` → `getByPlaceholder` → `getByAltText` → `getByTitle` → `getByTestId`, in that order — avoid raw CSS/XPath. If a Playwright MCP server is connected, use its live accessibility snapshot to confirm a selector actually matches before writing it, rather than assuming from JSX.
 - 🔧 Before presenting anything as done, run:

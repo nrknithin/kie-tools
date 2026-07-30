@@ -61,9 +61,13 @@ const PLAYWRIGHT_BUILTIN_FIXTURES = new Set([
   "viewport",
 ]);
 
-// Top-level workspace directories globbed by pnpm-workspace.yaml, including the
-// downstream-only packages-bamoe / packages-bamoe-artifacts trees.
-const WORKSPACE_GLOB_DIRS = ["packages", "examples", "scripts", "packages-bamoe", "packages-bamoe-artifacts"];
+// Workspace directories this skill actually scans for Playwright work. `examples/` has zero
+// Playwright usage anywhere (verified — no playwright.config* or tests-e2e/ under it) and
+// never will (it's example integration snippets, not editor packages), and the top-level
+// `scripts/` group is build tooling (run-script-if, etc.), never a test target either — so
+// neither is scanned, keeping "which package did you mean" unambiguous. `packages-bamoe/` and
+// `packages-bamoe-artifacts/` are downstream-only trees that DO apply on some forks.
+const WORKSPACE_GLOB_DIRS = ["packages", "packages-bamoe", "packages-bamoe-artifacts"];
 const SKIP_DIR_NAMES = new Set(["node_modules", "dist", "dist-tests-e2e", "dist-storybook", ".git", "__screenshots__"]);
 
 /** Walk upward from `startDir` until a directory containing pnpm-workspace.yaml is found. */
@@ -97,10 +101,9 @@ function stripShebang(content) {
 }
 
 // Which license header file (in assets/) applies to which workspace group.
-// packages/, examples/, and scripts/ (the upstream ASF tree) use the Apache header.
+// packages/ (the upstream ASF tree) uses the Apache header, the default below.
 // Downstream-only groups use the IBM header instead — see assets/.ibm-header.
-// Add an entry here (and the matching group name will already be discovered
-// automatically from pnpm-workspace.yaml) if another downstream-only group shows up.
+// Add an entry here if another downstream-only group needs a different header.
 const HEADER_FILE_BY_GROUP = {
   "packages-bamoe": ".ibm-header",
   "packages-bamoe-artifacts": ".ibm-header",
@@ -151,10 +154,9 @@ function buildNameMap(pkgs) {
   return map;
 }
 
-/** Packages (from packages/ or examples/) that already ship a playwright.config.ts. */
+/** Packages (from packages/, packages-bamoe/, or packages-bamoe-artifacts/) that already ship a playwright.config.ts. */
 function listPlaywrightPackages(repoRoot) {
-  const pkgs = listWorkspacePackages(repoRoot).filter((p) => p.group !== "scripts");
-  return pkgs.filter((p) => fs.existsSync(path.join(p.dir, "playwright.config.ts")));
+  return listWorkspacePackages(repoRoot).filter((p) => fs.existsSync(path.join(p.dir, "playwright.config.ts")));
 }
 
 /**
@@ -165,7 +167,7 @@ function listPlaywrightPackages(repoRoot) {
  */
 function resolvePackageDir(repoRoot, query) {
   if (fs.existsSync(query) && fs.statSync(query).isDirectory()) return path.resolve(query);
-  const pkgs = listWorkspacePackages(repoRoot).filter((p) => p.group !== "scripts");
+  const pkgs = listWorkspacePackages(repoRoot);
   const match = pkgs.find((p) => p.name === query || p.folder === query);
   return match ? match.dir : null;
 }

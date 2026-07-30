@@ -3,7 +3,7 @@
 /**
  * Guardrail for the license-header requirement. Which header is "correct" depends on which
  * workspace group a file lives in:
- *   - packages/, examples/, scripts/              -> assets/.apache-header (upstream ASF tree,
+ *   - packages/                                    -> assets/.apache-header (upstream ASF tree,
  *                                                     enforced repo-wide by Apache RAT in CI)
  *   - packages-bamoe/, packages-bamoe-artifacts/   -> assets/.ibm-header (downstream-only tree)
  *

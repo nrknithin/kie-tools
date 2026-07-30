@@ -114,7 +114,9 @@ function main() {
       encoding: "utf8",
     });
     report.checks.playwrightDiscovery = { status: discovery.status, output: discovery.stdout + discovery.stderr };
-    if (discovery.status !== 0) blocking = true;
+    // 4 = environment can't run this check right now (no node_modules / no config yet) — not a
+    // real failure, don't block on it. Only a real discovery failure (1) blocks.
+    if (discovery.status !== 0 && discovery.status !== 4) blocking = true;
   }
 
   console.log(JSON.stringify(report, null, 2));
