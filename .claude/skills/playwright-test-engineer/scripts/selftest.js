@@ -2,11 +2,11 @@
 "use strict";
 /**
  * Regression test for scripts/lib/workspace.js and check-playwright-config.js's self-case.
- * Every assertion here encodes a real bug found by hand-testing against this repo's actual
- * packages during development (not a synthetic/mocked scenario) — dist/ import resolution,
- * Node builtin detection, Playwright's `channel` fixture, the bare-"dist" subpath edge case,
- * and playwright-base's self-referential config check. None of these would be caught by
- * TypeScript or a linter; they're only caught by actually exercising the functions.
+ * Asserts against this repo's real packages (not mocks) on the resolution behaviors that are
+ * easy to silently break: dist/ import resolution, Node builtin detection, Playwright's
+ * `channel` fixture, the bare-"dist" subpath edge case, and playwright-base's self-referential
+ * config check. None of these would be caught by TypeScript or a linter — only by exercising
+ * the functions, which is what this does.
  *
  * Run this after any change to lib/workspace.js (or the scripts that depend on it) before
  * trusting the guardrail suite again. Exits non-zero if any assertion fails.

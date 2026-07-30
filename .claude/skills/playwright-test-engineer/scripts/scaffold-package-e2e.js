@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 "use strict";
 /**
- * Bootstraps Playwright infrastructure into a package that has none yet — the highest-drift-risk
- * case in the whole skill (SKILL.md previously just said "bootstrapping is fine" and left the
- * model to re-synthesize ~150 lines of config/env/fixtures from prose each time). This generates
- * the parts that are mechanical copies of the repo's own established pattern
- * (references/repo-conventions.md), and clearly flags the parts that still need a human/model
+ * Bootstraps Playwright infrastructure into a package that has none yet. Writing ~150 lines of
+ * config/env/fixtures by hand is the easiest place in this workflow to drift from the repo's
+ * conventions, so this generates the parts that are mechanical copies of the established
+ * pattern (references/repo-conventions.md) and clearly flags the parts that still need a real
  * decision (which storybook story to point at, which dev servers a served-app needs).
  *
  * Creates (only if missing — never overwrites):

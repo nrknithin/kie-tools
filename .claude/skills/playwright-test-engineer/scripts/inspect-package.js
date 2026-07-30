@@ -120,7 +120,7 @@ function inspectCrossPackageImports(repoRoot, pkgDir, pkgName) {
 function main() {
   const query = process.argv[2];
   if (!query) {
-    console.error("Usage: node inspect-package.js <package-folder-name-or-path>");
+    console.error("Usage: node inspect-package.js <package-folder-name-or-path> [--cache]");
     process.exit(2);
   }
   const repoRoot = resolveRepoRoot();

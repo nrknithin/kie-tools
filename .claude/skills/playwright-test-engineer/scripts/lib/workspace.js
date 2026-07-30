@@ -332,14 +332,12 @@ function writeAnalysisCache(pkgFolderName, scriptName, data) {
 }
 
 module.exports = {
-  findRepoRoot,
   resolveRepoRoot,
   readJson,
   listWorkspacePackages,
   buildNameMap,
   listPlaywrightPackages,
   walkFiles,
-  firstExisting,
   resolveWorkspaceImport,
   resolveRelativeImport,
   extractImportSpecifiers,

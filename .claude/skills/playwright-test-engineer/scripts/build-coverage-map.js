@@ -2,14 +2,14 @@
 "use strict";
 /**
  * Grounds Mode 2 §1 (Coverage map) / §5 (Missing scenarios) and Step 5a scenario validation in
- * a real cross-reference instead of the model manually walking src/ and tests-e2e/ by eye —
- * the single biggest token sink identified in the skill's audit (dmn-editor alone is 77 specs
- * against ~300 src files).
+ * a real cross-reference instead of walking src/ and tests-e2e/ by eye — which for a large
+ * package means correlating dozens of specs against hundreds of source files by hand
+ * (dmn-editor alone is 77 specs against ~300 src files).
  *
  * Two signals, different strength:
  *   - Storybook stories are matched by their exact COMPUTED story id (Storybook's own
- *     toId(title, exportName) algorithm — reverse-engineered and verified against real usage
- *     in this repo's fixtures, not guessed) against literal occurrences in tests-e2e/ source.
+ *     toId(title, exportName) algorithm, which this reimplements and checks against real
+ *     fixture usage in this repo) against literal occurrences in tests-e2e/ source.
  *     Since specs/fixtures navigate to `iframe.html?id=<that exact string>`, this is a strong
  *     signal. Some packages build the id half dynamically (`` `foo--${type}` ``); a prefix-only
  *     fallback catches that case and is labeled distinctly from an exact hit.
@@ -86,7 +86,7 @@ function extractStories(source) {
 function main() {
   const query = process.argv[2];
   if (!query) {
-    console.error("Usage: node build-coverage-map.js <package-folder-name-or-path>");
+    console.error("Usage: node build-coverage-map.js <package-folder-name-or-path> [--cache]");
     process.exit(2);
   }
   const repoRoot = resolveRepoRoot();

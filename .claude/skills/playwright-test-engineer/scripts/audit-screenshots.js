@@ -3,8 +3,8 @@
 /**
  * Grounds Mode 2 §2/§4 (screenshot-related test-quality and flakiness observations) in a real
  * cross-reference between `tests-e2e/__screenshots__/` baseline images and the
- * `toHaveScreenshot("...")` calls that reference them — this repo has hundreds of these
- * (dmn-editor alone has 470) and nobody has ever checked whether they're all still used.
+ * `toHaveScreenshot("...")` calls that reference them. Packages here accumulate hundreds of
+ * baselines (dmn-editor alone has 470), which is far past the point of checking by hand.
  *
  * Per `packages/playwright-base/playwright.config.ts`'s `snapshotPathTemplate`
  * (`{testDir}/__screenshots__/{projectName}/{testFileDir}/{arg}{ext}`), a baseline's path is

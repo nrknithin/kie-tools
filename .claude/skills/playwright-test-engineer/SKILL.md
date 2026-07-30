@@ -41,7 +41,7 @@ Other hard constraints, active during every step:
 - `scripts/verify-e2e-discovery.js <package>` — hands specs to Playwright's own `test --list` loader (needs `pnpm install` done first); the strongest check available, since it's the same resolution path CI uses, not an approximation of it.
 - `scripts/run-e2e-and-summarize.js <package> [-- <playwright args>]` — actually runs the suite (`playwright test --reporter=json`) and returns structured pass/fail/flaky counts plus failing-test titles/errors, instead of reading raw terminal output. Same environment requirements and exit-4 degradation as `verify-e2e-discovery.js`.
 - `scripts/run-all-checks.js <package> [--plan <path>] [--with-playwright-list]` — runs imports/headers/fixtures/config/conventions together and gives one pass/fail verdict. This is the one to call at Step 7a.
-- `scripts/selftest.js` — regression test for `lib/workspace.js` itself, encoding every resolver bug found during this skill's development (dist/ imports, Node builtins, Playwright's `channel` fixture, etc.). Run it after modifying anything under `scripts/lib/` — it's the only thing that would catch a regression there; nothing else will.
+- `scripts/selftest.js` — regression test for `lib/workspace.js` itself, covering the resolution behaviors that are easy to silently break (dist/ imports, Node builtins, Playwright's `channel` fixture, etc.). Run it after modifying anything under `scripts/lib/` — it's the only thing that would catch a regression there; nothing else will.
 
 None of these replace your judgment on _what_ to test or _why_ a test matters — they only verify the mechanical facts (existence, naming, wiring) that judgment alone tends to get wrong under confidence. Read a script's output; don't just trust that it ran.
 
@@ -85,7 +85,7 @@ node .claude/skills/playwright-test-engineer/scripts/inspect-package.js <package
 
 This gives you: `package.json` purpose/deps/`test-e2e*` scripts; the `playwright.config.ts` shape (does it merge the shared base, what's the baseURL, is it storybook-driven or a served app); `tests-e2e/` inventory (spec/fixture/screenshot counts, top-level feature-group folder names, whether containerization exists); and every _other_ workspace package this package's tests actually import from (real cross-package fixture/utility reuse, not guessed from memory).
 
-🔧 Then, instead of manually walking `src/`/`stories/` against every spec by eye (the single biggest token sink in this skill for a large package — dmn-editor alone is 77 specs against ~300 src files), run:
+🔧 Then, instead of manually walking `src/`/`stories/` against every spec by eye (for a large package that means correlating dozens of specs against hundreds of source files — dmn-editor alone is 77 specs against ~300 src files), run:
 
 ```bash
 node .claude/skills/playwright-test-engineer/scripts/build-coverage-map.js <package> --cache
