@@ -11,11 +11,11 @@ Every package here pins the exact same Playwright version (`@playwright/test@1.4
 
 ## Scope guard — enforce before anything else
 
-This skill operates strictly inside this pnpm monorepo (the repo root containing `pnpm-workspace.yaml`, `packages/`, and `examples/`). If the user asks for Playwright work on a project outside this repo, a generic Playwright tutorial, or tests for code that does not live here, politely refuse and redirect: explain this skill is scoped to this monorepo and offer to help with a package inside it instead. Never create, reference, or suggest files outside the repo root.
+This skill operates strictly inside this pnpm monorepo (the repo root containing `pnpm-workspace.yaml` and whatever workspace groups it globs — `packages/`, `examples/`, `scripts/`, and on some downstream forks also `packages-bamoe/`/`packages-bamoe-artifacts/`; run `scripts/list-target-packages.js` rather than assuming only `packages/`/`examples/` exist). If the user asks for Playwright work on a project outside this repo, a generic Playwright tutorial, or tests for code that does not live here, politely refuse and redirect: explain this skill is scoped to this monorepo and offer to help with a package inside it instead. Never create, reference, or suggest files outside the repo root.
 
 Other hard constraints, active during every step:
 
-1. **Package validation** — before doing anything with a user-named package, verify the directory actually exists under `packages/` or `examples/`. If it doesn't, show the valid candidates and ask again.
+1. **Package validation** — before doing anything with a user-named package, verify the directory actually exists in one of the repo's workspace groups (see `scripts/list-target-packages.js`, not just `packages/`/`examples/`). If it doesn't, show the valid candidates and ask again.
 2. **pnpm only** — every package-manager command is `pnpm` (this is a pnpm workspace; `npm`/`yarn` will corrupt it). Run tests with the package's existing scripts (`pnpm test-e2e:run` etc.), never ad-hoc `npx playwright test` unless no script exists.
 3. **No hallucinated imports** — every import, fixture, utility, and config reference in generated code must point to a file you have actually seen during analysis. If you need a fixture that doesn't exist, create it following the `__fixtures__` page-object pattern and say so.
 4. **Existing conventions win** — file naming, folder layout, license headers, fixture composition, config inheritance: copy what the repo does (see `references/repo-conventions.md`), don't improve on it uninvited.
@@ -36,7 +36,7 @@ Other hard constraints, active during every step:
 - `scripts/verify-e2e-discovery.js <package>` — hands specs to Playwright's own `test --list` loader (needs `pnpm install` done first); the strongest check available, since it's the same resolution path CI uses, not an approximation of it.
 - `scripts/run-all-checks.js <package> [--plan <path>] [--with-playwright-list]` — runs imports/headers/fixtures/config/conventions together and gives one pass/fail verdict. This is the one to call at Step 7a.
 
-None of these replace your judgment on *what* to test or *why* a test matters — they only verify the mechanical facts (existence, naming, wiring) that judgment alone tends to get wrong under confidence. Read a script's output; don't just trust that it ran.
+None of these replace your judgment on _what_ to test or _why_ a test matters — they only verify the mechanical facts (existence, naming, wiring) that judgment alone tends to get wrong under confidence. Read a script's output; don't just trust that it ran.
 
 ## Interactive flow
 
@@ -68,10 +68,11 @@ Analyse without narrating every file read. 🔧 Get the mechanical facts from a 
 node .claude/skills/playwright-test-engineer/scripts/inspect-package.js <package>
 ```
 
-This gives you: `package.json` purpose/deps/`test-e2e*` scripts; the `playwright.config.ts` shape (does it merge the shared base, what's the baseURL, is it storybook-driven or a served app); `tests-e2e/` inventory (spec/fixture/screenshot counts, top-level feature-group folder names, whether containerization exists); and every *other* workspace package this package's tests actually import from (real cross-package fixture/utility reuse, not guessed from memory).
+This gives you: `package.json` purpose/deps/`test-e2e*` scripts; the `playwright.config.ts` shape (does it merge the shared base, what's the baseURL, is it storybook-driven or a served app); `tests-e2e/` inventory (spec/fixture/screenshot counts, top-level feature-group folder names, whether containerization exists); and every _other_ workspace package this package's tests actually import from (real cross-package fixture/utility reuse, not guessed from memory).
 
 On top of that factual base, still do the part that's genuinely judgment:
-- Map `src/` at feature level (top-level modules/components, storybook stories if the package is storybook-driven) to know what exists vs. what the specs touch — this requires understanding what the code *does*, which the script can't tell you.
+
+- Map `src/` at feature level (top-level modules/components, storybook stories if the package is storybook-driven) to know what exists vs. what the specs touch — this requires understanding what the code _does_, which the script can't tell you.
 
 If this session has a Playwright MCP server connected (tools like `browser_navigate`/`browser_snapshot` — check what's actually available, don't assume), you can optionally start the package's dev server and navigate to the real storybook story/app route to ground your understanding in the live accessibility tree instead of inferring it from JSX. See `references/playwright-version-notes.md` for how this helps and its limits. This is a nice-to-have, not a requirement — proceed with static analysis if it's not available.
 
@@ -89,13 +90,13 @@ Ask: will the user provide test scenarios, or should you generate them from the 
 
 ### Step 5a — Scenario input or generation ⛔ gate
 
-**User-provided scenarios:** validate each one against the analysed source. For every scenario, identify the concrete feature/code path in the selected package it exercises. If a scenario cannot be mapped, flag it explicitly. If it clearly belongs to a *different* package (e.g. a boxed-expression scenario given while `dmn-editor` is selected — note that dmn-editor embeds the boxed expression editor, so check where the feature actually lives), warn the user, name the correct package, and ask whether to switch or continue anyway. Do not proceed until the user confirms the final scenario list.
+**User-provided scenarios:** validate each one against the analysed source. For every scenario, identify the concrete feature/code path in the selected package it exercises. If a scenario cannot be mapped, flag it explicitly. If it clearly belongs to a _different_ package (e.g. a boxed-expression scenario given while `dmn-editor` is selected — note that dmn-editor embeds the boxed expression editor, so check where the feature actually lives), warn the user, name the correct package, and ask whether to switch or continue anyway. Do not proceed until the user confirms the final scenario list.
 
 **Generated scenarios:** derive a comprehensive list from the source analysis — happy paths, edge cases, error states, and integration points (undo/redo, keyboard interaction, screenshot-worthy visual states, cross-package integrations). Present the full list for review; let the user add/remove/modify. Do not proceed until the user explicitly confirms.
 
 ### Step 6a — Plan file ⛔ gate
 
-Generate a `TEST_PLAN.md` for the target package using `assets/TEST_PLAN-template.md`. The repo has no pre-existing plan-file convention, so this template *is* the convention — keep it. For every scenario include: name + description; the source feature/code path covered (real file paths); testing approach (all Playwright tests in this repo are E2E against a storybook iframe or a served app — say which, and whether the scenario needs a screenshot assertion); fixtures/utilities/configs used (only ones that exist or that you will create); expected assertions and acceptance criteria; prerequisite state or data setup.
+Generate a `TEST_PLAN.md` for the target package using `assets/TEST_PLAN-template.md`. The repo has no pre-existing plan-file convention, so this template _is_ the convention — keep it. For every scenario include: name + description; the source feature/code path covered (real file paths); testing approach (all Playwright tests in this repo are E2E against a storybook iframe or a served app — say which, and whether the scenario needs a screenshot assertion); fixtures/utilities/configs used (only ones that exist or that you will create); expected assertions and acceptance criteria; prerequisite state or data setup.
 
 Before showing the plan to the user, 🔧 verify it yourself:
 
@@ -141,7 +142,7 @@ Then work through `references/evaluation-checklist.md` against every spec and fi
 1. **Coverage map** — source features/files vs. the specs that exercise them; explicitly list what is uncovered.
 2. **Test quality** — start from `check-spec-conventions.js`'s findings (naming, `waitForTimeout`, raw selectors, screenshot naming, screenshot-only tests) and add your own read on assertion strength and missing error-state coverage. Don't re-derive by eye what the script already found mechanically — cite its findings, then add the judgment layer (why it matters, how bad it is here).
 3. **Fixture & config hygiene** — start from `check-fixture-wiring.js`'s `undeclaredUsages` (a hard problem — a spec using a fixture that doesn't exist) and `orphanedFixtureFiles` (a lead to check, since legitimate cross-package/composed usage can look orphaned), plus `check-playwright-config.js`'s findings (missing base merge, redeclared base-owned keys). Add your own read on anything those don't cover, e.g. duplicated setup logic across spec files that should be a shared fixture.
-4. **Flakiness risk** — tests likely to flake and *why* (position-based clicks, screenshot diffs across browsers, race-prone waits, order dependence). This section is judgment — the scripts don't run tests repeatedly to detect actual flakiness, they only flag static anti-patterns that correlate with it.
+4. **Flakiness risk** — tests likely to flake and _why_ (position-based clicks, screenshot diffs across browsers, race-prone waits, order dependence). This section is judgment — the scripts don't run tests repeatedly to detect actual flakiness, they only flag static anti-patterns that correlate with it.
 5. **Missing scenarios** — important untested scenarios derived from the source analysis.
 6. **Recommendations** — prioritised (high/medium/low), each actionable and tied to a specific file.
 

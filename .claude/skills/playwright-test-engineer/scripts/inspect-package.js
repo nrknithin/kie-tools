@@ -1,4 +1,23 @@
 #!/usr/bin/env node
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 "use strict";
 /**
  * Step 2 ("Package analysis") guardrail: everything in this script is a plain filesystem/text
@@ -13,20 +32,24 @@
 
 const fs = require("fs");
 const path = require("path");
-const { resolveRepoRoot, listWorkspacePackages, walkFiles, readJson, extractImportSpecifiers, resolveWorkspaceImport, buildNameMap } = require("./lib/workspace");
-
-function resolvePackageDir(repoRoot, query) {
-  if (fs.existsSync(query) && fs.statSync(query).isDirectory()) return path.resolve(query);
-  const pkgs = listWorkspacePackages(repoRoot).filter((p) => p.group !== "scripts");
-  const match = pkgs.find((p) => p.name === query || p.folder === query);
-  return match ? match.dir : null;
-}
+const {
+  resolveRepoRoot,
+  listWorkspacePackages,
+  walkFiles,
+  readJson,
+  extractImportSpecifiers,
+  resolveWorkspaceImport,
+  buildNameMap,
+  resolvePackageDir,
+} = require("./lib/workspace");
 
 function inspectPackageJson(pkgDir) {
   const pkgJsonPath = path.join(pkgDir, "package.json");
   if (!fs.existsSync(pkgJsonPath)) return null;
   const pkg = readJson(pkgJsonPath);
-  const testE2eScripts = Object.fromEntries(Object.entries(pkg.scripts || {}).filter(([k]) => k.startsWith("test-e2e")));
+  const testE2eScripts = Object.fromEntries(
+    Object.entries(pkg.scripts || {}).filter(([k]) => k.startsWith("test-e2e"))
+  );
   return {
     name: pkg.name,
     description: pkg.description || null,
@@ -48,7 +71,11 @@ function inspectPlaywrightConfig(pkgDir) {
     exists: true,
     mergesSharedBaseConfig: mergesBase,
     baseURLTemplate: baseURLMatch ? baseURLMatch[1] : null,
-    servingShape: webServerIsArray ? "multi-server (full application)" : isStorybook ? "single storybook iframe" : "single webServer (non-storybook)",
+    servingShape: webServerIsArray
+      ? "multi-server (full application)"
+      : isStorybook
+        ? "single storybook iframe"
+        : "single webServer (non-storybook)",
   };
 }
 
@@ -89,7 +116,10 @@ function inspectCrossPackageImports(repoRoot, pkgDir, pkgName) {
       if (specifier.startsWith(".")) continue;
       const resolved = resolveWorkspaceImport(specifier, nameMap);
       if (resolved.matched && resolved.status !== "unresolved") {
-        const otherName = specifier.split("/").slice(0, specifier.startsWith("@") ? 2 : 1).join("/");
+        const otherName = specifier
+          .split("/")
+          .slice(0, specifier.startsWith("@") ? 2 : 1)
+          .join("/");
         // Only report if it actually IS a workspace package name and it's not this package itself.
         if (nameMap.has(otherName) && otherName !== pkgName) {
           if (!found.has(otherName)) found.set(otherName, new Set());

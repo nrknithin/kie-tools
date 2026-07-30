@@ -21,6 +21,7 @@ Every Playwright-enabled package in this repo pins the exact same version: `@pla
 If this session has an MCP server exposing tools like `browser_navigate`, `browser_snapshot`, `browser_click`, or similar (check the available tools list / `ToolSearch` for names — don't assume a specific tool name without confirming it's actually present), it's the official `microsoft/playwright-mcp` server or a compatible one. It drives a real browser via Playwright and can return an accessibility-tree snapshot of the live page instead of you inferring one from JSX.
 
 Where this genuinely helps, if available:
+
 - **Step 2 / Step 7a selector accuracy**: instead of guessing a component's accessible role/name from reading `src/`, start the package's dev server (`pnpm start`, same command `playwright.config.ts`'s `webServer` already uses) and navigate the MCP browser to the actual storybook story or app route, then read the real accessibility snapshot before writing a `getByRole(...)`/`getByTestId(...)` locator into a fixture. This directly reduces the risk of a selector that compiles but doesn't match anything at runtime.
 - **Mode 2 evaluation**: cross-checking whether a spec's assumed selector still matches the live app is a good sanity check for "selector stability" findings you're not fully sure about.
 

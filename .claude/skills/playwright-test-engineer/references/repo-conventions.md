@@ -52,7 +52,10 @@ If the selected package has no `playwright.config.ts` yet (bootstrap case, e.g. 
 - `projectNames.ts` exports `ProjectName`: `CHROMIUM = "chromium"`, `WEBKIT = "webkit"`, `GOOGLE_CHROME = "Google Chrome"`.
 - `annotations.ts` exports `TestAnnotations`: `REGRESSION = "regression"`, `AFFECTED_BY = "affected-by"`, `WORKAROUND_DUE_TO = "workaround-due-to"`. Use these to tag tests that pin a bugfix, e.g.:
   ```ts
-  test.info().annotations.push({ type: TestAnnotations.REGRESSION, description: "https://github.com/apache/incubator-kie-issues/issues/980" });
+  test.info().annotations.push({
+    type: TestAnnotations.REGRESSION,
+    description: "https://github.com/apache/incubator-kie-issues/issues/980",
+  });
   ```
 - Its `bin.js`/`src/bin.ts` provides the `playwright-base-container` CLI (used by the `test-e2e:container:*` scripts below) for running tests inside a Docker/Podman container — this is how CI runs E2E, so the local `pnpm test-e2e:run` result and the containerized one can differ (fonts/rendering → screenshot diffs).
 
@@ -96,9 +99,13 @@ type PackageFixtures = {
 };
 
 export const test = base.extend<PackageFixtures>({
-  diagram: async ({ page }, use) => { await use(new Diagram(page)); },
+  diagram: async ({ page }, use) => {
+    await use(new Diagram(page));
+  },
   // fixtures can depend on other fixtures, e.g.:
-  nodes: async ({ page, diagram, browserName }, use) => { await use(new Nodes(page, diagram, browserName)); },
+  nodes: async ({ page, diagram, browserName }, use) => {
+    await use(new Nodes(page, diagram, browserName));
+  },
 });
 
 export { expect } from "@playwright/test";

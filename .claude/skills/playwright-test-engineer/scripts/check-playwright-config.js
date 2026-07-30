@@ -1,4 +1,23 @@
 #!/usr/bin/env node
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 "use strict";
 /**
  * Guardrail for hard constraint #4 ("don't duplicate infrastructure") and Mode 2's
@@ -21,18 +40,21 @@
 
 const fs = require("fs");
 const path = require("path");
-const { resolveRepoRoot, listWorkspacePackages, readJson } = require("./lib/workspace");
+const { resolveRepoRoot, readJson, resolvePackageDir } = require("./lib/workspace");
 
 const SHARED_BASE_PACKAGE_NAME = "@kie-tools/playwright-base";
 
-const BASE_OWNED_TOP_LEVEL_KEYS = ["testDir", "outputDir", "snapshotPathTemplate", "fullyParallel", "forbidOnly", "retries", "workers", "reporter", "expect"];
-
-function resolvePackageDir(repoRoot, query) {
-  if (fs.existsSync(query) && fs.statSync(query).isDirectory()) return path.resolve(query);
-  const pkgs = listWorkspacePackages(repoRoot).filter((p) => p.group !== "scripts");
-  const match = pkgs.find((p) => p.name === query || p.folder === query);
-  return match ? match.dir : null;
-}
+const BASE_OWNED_TOP_LEVEL_KEYS = [
+  "testDir",
+  "outputDir",
+  "snapshotPathTemplate",
+  "fullyParallel",
+  "forbidOnly",
+  "retries",
+  "workers",
+  "reporter",
+  "expect",
+];
 
 function main() {
   const query = process.argv[2];
@@ -56,7 +78,15 @@ function main() {
   if (pkgName === SHARED_BASE_PACKAGE_NAME) {
     // This IS the shared base config other packages merge over — it defines the keys this
     // script checks for elsewhere, so "does it import/merge itself" is a meaningless question.
-    console.log(JSON.stringify({ note: `${SHARED_BASE_PACKAGE_NAME} is the shared base config itself — not a consumer of it, nothing to check.` }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          note: `${SHARED_BASE_PACKAGE_NAME} is the shared base config itself — not a consumer of it, nothing to check.`,
+        },
+        null,
+        2
+      )
+    );
     process.exit(0);
   }
 
@@ -72,15 +102,27 @@ function main() {
   const importsBase = /from\s+["']@kie-tools\/playwright-base\/playwright\.config["']/.test(source);
   const callsMerge = /merge\(/.test(source);
   if (!importsBase) {
-    findings.push({ severity: "high", rule: "missing-base-import", message: 'does not import "@kie-tools/playwright-base/playwright.config" — every Playwright-enabled package in this repo merges over the shared base' });
+    findings.push({
+      severity: "high",
+      rule: "missing-base-import",
+      message:
+        'does not import "@kie-tools/playwright-base/playwright.config" — every Playwright-enabled package in this repo merges over the shared base',
+    });
   }
   if (importsBase && !callsMerge) {
-    findings.push({ severity: "high", rule: "missing-merge-call", message: "imports the shared base config but never calls merge(...) on it — it's imported but not actually applied" });
+    findings.push({
+      severity: "high",
+      rule: "missing-merge-call",
+      message:
+        "imports the shared base config but never calls merge(...) on it — it's imported but not actually applied",
+    });
   }
 
   // Find the FIRST top-level defineConfig({...}) block (the package's own customConfig),
   // not the final merge(...) call, so we only inspect what this package itself declares.
-  const customConfigMatch = source.match(/defineConfig\(\{([\s\S]*)\}\s*\)\s*;\s*\n\s*export default defineConfig\(merge/);
+  const customConfigMatch = source.match(
+    /defineConfig\(\{([\s\S]*)\}\s*\)\s*;\s*\n\s*export default defineConfig\(merge/
+  );
   const customConfigBody = customConfigMatch ? customConfigMatch[1] : source;
 
   for (const key of BASE_OWNED_TOP_LEVEL_KEYS) {
@@ -97,13 +139,19 @@ function main() {
   const bySeverity = { high: 0, medium: 0 };
   for (const f of findings) bySeverity[f.severity] = (bySeverity[f.severity] || 0) + 1;
 
-  console.log(JSON.stringify({ pkgDir: path.relative(repoRoot, pkgDir), importsBase, callsMerge, bySeverity, findings }, null, 2));
+  console.log(
+    JSON.stringify({ pkgDir: path.relative(repoRoot, pkgDir), importsBase, callsMerge, bySeverity, findings }, null, 2)
+  );
 
   if (bySeverity.high > 0) {
-    console.error(`\n${bySeverity.high} high-severity config finding(s). This package's config does not correctly inherit the shared base.`);
+    console.error(
+      `\n${bySeverity.high} high-severity config finding(s). This package's config does not correctly inherit the shared base.`
+    );
     process.exit(1);
   }
-  console.error(`\nConfig inheritance OK.${bySeverity.medium > 0 ? ` ${bySeverity.medium} redeclared-key note(s) reported above.` : ""}`);
+  console.error(
+    `\nConfig inheritance OK.${bySeverity.medium > 0 ? ` ${bySeverity.medium} redeclared-key note(s) reported above.` : ""}`
+  );
 }
 
 main();

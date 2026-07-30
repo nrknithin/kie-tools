@@ -1,4 +1,23 @@
 #!/usr/bin/env node
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 "use strict";
 /**
  * Guardrail for "reuse shared fixtures, don't duplicate infrastructure" and for catching
@@ -19,14 +38,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { resolveRepoRoot, listWorkspacePackages, walkFiles, PLAYWRIGHT_BUILTIN_FIXTURES } = require("./lib/workspace");
-
-function resolvePackageDir(repoRoot, query) {
-  if (fs.existsSync(query) && fs.statSync(query).isDirectory()) return path.resolve(query);
-  const pkgs = listWorkspacePackages(repoRoot).filter((p) => p.group !== "scripts");
-  const match = pkgs.find((p) => p.name === query || p.folder === query);
-  return match ? match.dir : null;
-}
+const { resolveRepoRoot, walkFiles, PLAYWRIGHT_BUILTIN_FIXTURES, resolvePackageDir } = require("./lib/workspace");
 
 function extractExportedNames(source) {
   const names = [];
@@ -82,7 +94,10 @@ function main() {
   if (!fs.existsSync(baseFile)) {
     console.log(
       JSON.stringify(
-        { note: "No tests-e2e/__fixtures__/base.ts found — nothing to check yet (bootstrap case).", pkgDir: path.relative(repoRoot, pkgDir) },
+        {
+          note: "No tests-e2e/__fixtures__/base.ts found — nothing to check yet (bootstrap case).",
+          pkgDir: path.relative(repoRoot, pkgDir),
+        },
         null,
         2
       )
@@ -134,7 +149,9 @@ function main() {
     process.exit(1);
   }
   if (orphanedFixtureFiles.length > 0) {
-    console.error(`\nNote: ${orphanedFixtureFiles.length} fixture file(s) export something not referenced in base.ts (warning only).`);
+    console.error(
+      `\nNote: ${orphanedFixtureFiles.length} fixture file(s) export something not referenced in base.ts (warning only).`
+    );
   }
   console.error("\nFixture wiring OK.");
 }

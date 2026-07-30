@@ -36,7 +36,7 @@ Call out tests as flaky-risk when they show:
 - Cross-browser-only assertions (`browserName` checks) that suggest a test behaves differently per project — a sign the underlying interaction isn't actually stable.
 - Reliance on real timers/network without mocking where the target package has a mocking convention already (check sibling specs).
 
-Explain *why* for each flagged test, not just that it's "risky".
+Explain _why_ for each flagged test, not just that it's "risky".
 
 ## 5. Missing scenarios
 

@@ -1,4 +1,23 @@
 #!/usr/bin/env node
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 "use strict";
 /**
  * Single entry point tying every guardrail script together. This is what the skill should
@@ -20,17 +39,9 @@
  * (e.g. "unconfigured" license header, which is a distinct outcome — see check-license-header.js).
  */
 
-const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
-const { resolveRepoRoot, listWorkspacePackages, walkFiles } = require("./lib/workspace");
-
-function resolvePackageDir(repoRoot, query) {
-  if (fs.existsSync(query) && fs.statSync(query).isDirectory()) return path.resolve(query);
-  const pkgs = listWorkspacePackages(repoRoot).filter((p) => p.group !== "scripts");
-  const match = pkgs.find((p) => p.name === query || p.folder === query);
-  return match ? match.dir : null;
-}
+const { resolveRepoRoot, walkFiles, resolvePackageDir } = require("./lib/workspace");
 
 function runNode(scriptName, args) {
   const scriptPath = path.join(__dirname, scriptName);
@@ -48,13 +59,25 @@ function main() {
   const argv = process.argv.slice(2);
   const query = argv[0];
   if (!query) {
-    console.error("Usage: node run-all-checks.js <package-folder-name-or-path> [--plan <path>] [--files a.ts,b.ts] [--with-playwright-list]");
+    console.error(
+      "Usage: node run-all-checks.js <package-folder-name-or-path> [--plan <path>] [--files a.ts,b.ts] [--with-playwright-list]"
+    );
     process.exit(2);
   }
-  const planIdx = argv.indexOf("--plan");
-  const planPath = planIdx !== -1 ? argv[planIdx + 1] : null;
-  const filesIdx = argv.indexOf("--files");
-  const explicitFiles = filesIdx !== -1 ? argv[filesIdx + 1].split(",") : null;
+  function valueAfterFlag(flag) {
+    const idx = argv.indexOf(flag);
+    if (idx === -1) return undefined;
+    const value = argv[idx + 1];
+    if (!value || value.startsWith("--")) {
+      console.error(`"${flag}" requires a value (got ${value === undefined ? "nothing" : `"${value}"`}).`);
+      process.exit(2);
+    }
+    return value;
+  }
+
+  const planPath = valueAfterFlag("--plan") || null;
+  const explicitFilesArg = valueAfterFlag("--files");
+  const explicitFiles = explicitFilesArg ? explicitFilesArg.split(",") : null;
   const withPlaywrightList = argv.includes("--with-playwright-list");
 
   const repoRoot = resolveRepoRoot();
@@ -106,12 +129,22 @@ function main() {
   }
 
   if (withPlaywrightList) {
-    const discovery = spawnSync(process.execPath, [path.join(__dirname, "verify-e2e-discovery.js"), pkgDir], { encoding: "utf8" });
+    const discovery = spawnSync(process.execPath, [path.join(__dirname, "verify-e2e-discovery.js"), pkgDir], {
+      encoding: "utf8",
+    });
     report.checks.playwrightDiscovery = { status: discovery.status, output: discovery.stdout + discovery.stderr };
     if (discovery.status !== 0) blocking = true;
   }
 
   console.log(JSON.stringify(report, null, 2));
+
+  const unconfiguredHeaderCount = (report.checks.licenseHeaders && report.checks.licenseHeaders.unconfigured) || [];
+  if (unconfiguredHeaderCount.length > 0) {
+    console.error(
+      `\nNote: ${unconfiguredHeaderCount.length} file(s) belong to a workspace group whose license header ` +
+        `isn't configured yet (see assets/.ibm-header) — not checked, not a pass. Say so explicitly, don't fold it into a clean verdict.`
+    );
+  }
   if (blocking) {
     console.error("\nOne or more checks failed. Do not present this package's tests as done until they pass.");
     process.exit(1);

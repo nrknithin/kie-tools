@@ -1,4 +1,23 @@
 #!/usr/bin/env node
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 "use strict";
 /**
  * The strongest guardrail available: hand the spec(s) to Playwright's own test loader
@@ -17,14 +36,7 @@
 const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
-const { resolveRepoRoot, listWorkspacePackages } = require("./lib/workspace");
-
-function resolvePackageDir(repoRoot, query) {
-  if (fs.existsSync(query) && fs.statSync(query).isDirectory()) return path.resolve(query);
-  const pkgs = listWorkspacePackages(repoRoot).filter((p) => p.group !== "scripts");
-  const match = pkgs.find((p) => p.name === query || p.folder === query);
-  return match ? match.dir : null;
-}
+const { resolveRepoRoot, resolvePackageDir } = require("./lib/workspace");
 
 function main() {
   const args = process.argv.slice(2);
@@ -48,7 +60,10 @@ function main() {
     process.exit(2);
   }
 
-  if (!fs.existsSync(path.join(pkgDir, "node_modules")) && !fs.existsSync(path.join(repoRoot, "node_modules", ".modules.yaml"))) {
+  if (
+    !fs.existsSync(path.join(pkgDir, "node_modules")) &&
+    !fs.existsSync(path.join(repoRoot, "node_modules", ".modules.yaml"))
+  ) {
     console.error(
       "No node_modules found (neither in the package nor at the repo root). Run `pnpm install` at the repo root first — " +
         "this check needs Playwright's own loader, which needs real installed dependencies."
@@ -56,7 +71,9 @@ function main() {
     process.exit(2);
   }
   if (!fs.existsSync(path.join(pkgDir, "playwright.config.ts"))) {
-    console.error(`No playwright.config.ts in ${path.relative(repoRoot, pkgDir)} — nothing to discover yet (bootstrap case).`);
+    console.error(
+      `No playwright.config.ts in ${path.relative(repoRoot, pkgDir)} — nothing to discover yet (bootstrap case).`
+    );
     process.exit(2);
   }
 

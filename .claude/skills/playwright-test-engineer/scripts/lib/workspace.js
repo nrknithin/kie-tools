@@ -1,3 +1,22 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 "use strict";
 /**
  * Shared helpers for the playwright-test-engineer skill's guardrail scripts.
@@ -86,6 +105,16 @@ function readJson(file) {
   return JSON.parse(fs.readFileSync(file, "utf8"));
 }
 
+/**
+ * Strip a leading shebang line (e.g. "#!/usr/bin/env node\n") if present. Executable scripts
+ * legitimately need the shebang as the literal first line of the file, before the license
+ * header — Apache RAT and most header checkers account for this. Comparing header text
+ * without stripping the shebang first produces a false "missing header" on every CLI script.
+ */
+function stripShebang(content) {
+  return content.startsWith("#!") ? content.slice(content.indexOf("\n") + 1) : content;
+}
+
 // Which license header file (in assets/) applies to which workspace group.
 // packages/, examples/, and scripts/ (the upstream ASF tree) use the Apache header.
 // Downstream-only groups use the IBM header instead — see assets/.ibm-header.
@@ -145,6 +174,19 @@ function buildNameMap(pkgs) {
 function listPlaywrightPackages(repoRoot) {
   const pkgs = listWorkspacePackages(repoRoot).filter((p) => p.group !== "scripts");
   return pkgs.filter((p) => fs.existsSync(path.join(p.dir, "playwright.config.ts")));
+}
+
+/**
+ * Resolve a user-supplied package identifier — a real directory path, a workspace folder name
+ * (e.g. "dmn-editor"), or a package.json "name" (e.g. "@kie-tools/dmn-editor") — to its
+ * absolute directory, or null if it doesn't match anything. Shared by every script that takes
+ * a "<package>" argument, so package resolution can't silently drift between them.
+ */
+function resolvePackageDir(repoRoot, query) {
+  if (fs.existsSync(query) && fs.statSync(query).isDirectory()) return path.resolve(query);
+  const pkgs = listWorkspacePackages(repoRoot).filter((p) => p.group !== "scripts");
+  const match = pkgs.find((p) => p.name === query || p.folder === query);
+  return match ? match.dir : null;
 }
 
 /** Recursively collect files under `dir` whose basename matches `filter(name)`. */
@@ -304,4 +346,6 @@ module.exports = {
   headerFilePathForGroup,
   UNCONFIGURED_HEADER_SENTINEL,
   PLAYWRIGHT_BUILTIN_FIXTURES,
+  stripShebang,
+  resolvePackageDir,
 };

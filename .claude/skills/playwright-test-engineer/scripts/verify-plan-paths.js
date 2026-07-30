@@ -1,4 +1,23 @@
 #!/usr/bin/env node
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 "use strict";
 /**
  * Step 5a/6a guardrail: a TEST_PLAN.md is only as trustworthy as the file paths it cites.
@@ -23,14 +42,13 @@
 
 const fs = require("fs");
 const path = require("path");
-const { resolveRepoRoot, listWorkspacePackages, buildNameMap, resolveWorkspaceImport } = require("./lib/workspace");
-
-function resolvePackageDir(repoRoot, query) {
-  if (fs.existsSync(query) && fs.statSync(query).isDirectory()) return path.resolve(query);
-  const pkgs = listWorkspacePackages(repoRoot).filter((p) => p.group !== "scripts");
-  const match = pkgs.find((p) => p.name === query || p.folder === query);
-  return match ? match.dir : null;
-}
+const {
+  resolveRepoRoot,
+  listWorkspacePackages,
+  buildNameMap,
+  resolveWorkspaceImport,
+  resolvePackageDir,
+} = require("./lib/workspace");
 
 function extractCitedPaths(planSource) {
   const re = /\*\*(Covers|File|Fixtures\/utilities used)\*\*:\s*(.+)/g;
@@ -91,8 +109,12 @@ function main() {
     const ws = resolveWorkspaceImport(candidate, nameMap);
     if (ws.matched) {
       if (ws.status === "resolved") return { kind: "resolved", value: path.relative(repoRoot, ws.path) };
-      if (ws.status === "requires-build") return { kind: "requires-build", value: ws.path ? path.relative(repoRoot, ws.path) : null };
-      return { kind: "unresolved-workspace", value: `"${candidate}" matches workspace package "${ws.packageName}" but subpath "${ws.subpath}" doesn't exist (and isn't a dist/ path)` };
+      if (ws.status === "requires-build")
+        return { kind: "requires-build", value: ws.path ? path.relative(repoRoot, ws.path) : null };
+      return {
+        kind: "unresolved-workspace",
+        value: `"${candidate}" matches workspace package "${ws.packageName}" but subpath "${ws.subpath}" doesn't exist (and isn't a dist/ path)`,
+      };
     }
     const fromPkg = path.join(pkgDir, candidate);
     const fromRoot = path.join(repoRoot, candidate);
@@ -110,7 +132,13 @@ function main() {
       continue;
     }
     if (result.kind === "requires-build") {
-      notes.push({ field, candidate, note: result.value ? `dist/ output not built yet (src/ mirror exists at ${result.value})` : "dist/ output not built yet and no src/ mirror found — verify manually once built" });
+      notes.push({
+        field,
+        candidate,
+        note: result.value
+          ? `dist/ output not built yet (src/ mirror exists at ${result.value})`
+          : "dist/ output not built yet and no src/ mirror found — verify manually once built",
+      });
       continue;
     }
     if (result.kind === "resolved") {
@@ -119,23 +147,45 @@ function main() {
     }
 
     if (field === "Covers") {
-      problems.push({ field, candidate, issue: `"Covers" must reference existing source — no file found relative to package root (${path.relative(repoRoot, pkgDir)}) or repo root` });
+      problems.push({
+        field,
+        candidate,
+        issue: `"Covers" must reference existing source — no file found relative to package root (${path.relative(repoRoot, pkgDir)}) or repo root`,
+      });
     } else if (field === "File") {
-      const validNaming = /^tests-e2e\/.+\/[a-z][a-zA-Z0-9]*\.spec\.ts$/.test(candidate) || /^[a-z][a-zA-Z0-9]*\.spec\.ts$/.test(path.basename(candidate));
+      const validNaming =
+        /^tests-e2e\/.+\/[a-z][a-zA-Z0-9]*\.spec\.ts$/.test(candidate) ||
+        /^[a-z][a-zA-Z0-9]*\.spec\.ts$/.test(path.basename(candidate));
       if (!validNaming) {
-        problems.push({ field, candidate, issue: 'planned spec file name should be camelCase.spec.ts under tests-e2e/<featureGroup>/' });
+        problems.push({
+          field,
+          candidate,
+          issue: "planned spec file name should be camelCase.spec.ts under tests-e2e/<featureGroup>/",
+        });
       } else {
         notes.push({ field, candidate, note: "does not exist yet — expected, this is the file Step 7a will create" });
       }
     } else {
-      notes.push({ field, candidate, note: "fixture/utility does not exist yet — expected if the plan marks it as new" });
+      notes.push({
+        field,
+        candidate,
+        note: "fixture/utility does not exist yet — expected if the plan marks it as new",
+      });
     }
   }
 
-  console.log(JSON.stringify({ planPath, pkgDir: path.relative(repoRoot, pkgDir), pathsChecked: unique.length, verified, notes, problems }, null, 2));
+  console.log(
+    JSON.stringify(
+      { planPath, pkgDir: path.relative(repoRoot, pkgDir), pathsChecked: unique.length, verified, notes, problems },
+      null,
+      2
+    )
+  );
 
   if (problems.length > 0) {
-    console.error(`\n${problems.length} path(s) cited in the plan don't correspond to real files. Fix the plan (or the scenario) before implementation.`);
+    console.error(
+      `\n${problems.length} path(s) cited in the plan don't correspond to real files. Fix the plan (or the scenario) before implementation.`
+    );
     process.exit(1);
   }
   console.error(`\nAll ${verified.length} cited path(s) in the plan resolve to real files.`);
