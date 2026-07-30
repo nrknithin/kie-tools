@@ -31,7 +31,9 @@ Other hard constraints, active during every step:
 - `scripts/check-license-header.js <files...>` — verifies the exact, group-correct header is present (exit 0 pass, 1 fail, 3 "header not configured yet for this group").
 - `scripts/check-fixture-wiring.js <package>` — flags fixtures a spec destructures that were never declared in `__fixtures__/base.ts`.
 - `scripts/check-playwright-config.js <package>` — verifies the config actually merges `@kie-tools/playwright-base/playwright.config` and flags redeclared base-owned keys (constraint #4's "config inheritance", mechanically enforced instead of eyeballed).
-- `scripts/check-spec-conventions.js <package>` — naming, anti-patterns (`waitForTimeout`, raw selectors), screenshot naming/coverage heuristics.
+- `scripts/check-spec-conventions.js <package>` — naming, anti-patterns (`waitForTimeout`, raw selectors — checked in both specs and `__fixtures__/`), screenshot naming/coverage heuristics.
+- `scripts/build-coverage-map.js <package>` — cross-references `src/`/`stories/` against `tests-e2e/` (strong signal for Storybook story ids, weak naive-match for `src/` filenames — read its `disclaimer` field). This is Step 2/Mode 2's biggest token-savings script for a large package.
+- `scripts/audit-screenshots.js <package>` — orphaned `__screenshots__/*.png` baselines with no matching `toHaveScreenshot(...)` call, and the reverse (referenced names with no baseline yet).
 - `scripts/verify-plan-paths.js <plan.md> <package>` — every `**Covers**:`/`**File**:`/`**Fixtures/utilities used**:` path in a plan is checked against the real filesystem.
 - `scripts/verify-e2e-discovery.js <package>` — hands specs to Playwright's own `test --list` loader (needs `pnpm install` done first); the strongest check available, since it's the same resolution path CI uses, not an approximation of it.
 - `scripts/run-all-checks.js <package> [--plan <path>] [--with-playwright-list]` — runs imports/headers/fixtures/config/conventions together and gives one pass/fail verdict. This is the one to call at Step 7a.
@@ -70,9 +72,17 @@ node .claude/skills/playwright-test-engineer/scripts/inspect-package.js <package
 
 This gives you: `package.json` purpose/deps/`test-e2e*` scripts; the `playwright.config.ts` shape (does it merge the shared base, what's the baseURL, is it storybook-driven or a served app); `tests-e2e/` inventory (spec/fixture/screenshot counts, top-level feature-group folder names, whether containerization exists); and every _other_ workspace package this package's tests actually import from (real cross-package fixture/utility reuse, not guessed from memory).
 
+🔧 Then, instead of manually walking `src/`/`stories/` against every spec by eye (the single biggest token sink in this skill for a large package — dmn-editor alone is 77 specs against ~300 src files), run:
+
+```bash
+node .claude/skills/playwright-test-engineer/scripts/build-coverage-map.js <package>
+```
+
+Read its `disclaimer` field before trusting the output: the `storiesLikely*` result matches on the exact Storybook story id a spec navigates to (`iframe.html?id=<this>`) and is a strong signal; the `featuresLikely*` result is a much weaker naive filename match and will show a high "uncovered" rate that does **not** mean untested (E2E specs interact through the rendered UI, not by importing `src/` modules by name) — use it only as a rough starting point to skim, never as a coverage verdict on its own.
+
 On top of that factual base, still do the part that's genuinely judgment:
 
-- Map `src/` at feature level (top-level modules/components, storybook stories if the package is storybook-driven) to know what exists vs. what the specs touch — this requires understanding what the code _does_, which the script can't tell you.
+- Understand what each feature/story actually _does_ and whether the specs that (per the coverage map) likely touch it actually exercise it meaningfully — the script found the candidates, it didn't verify the scenario.
 
 If this session has a Playwright MCP server connected (tools like `browser_navigate`/`browser_snapshot` — check what's actually available, don't assume), you can optionally start the package's dev server and navigate to the real storybook story/app route to ground your understanding in the live accessibility tree instead of inferring it from JSX. See `references/playwright-version-notes.md` for how this helps and its limits. This is a nice-to-have, not a requirement — proceed with static analysis if it's not available.
 
@@ -135,15 +145,17 @@ Only after plan confirmation:
 node .claude/skills/playwright-test-engineer/scripts/check-spec-conventions.js <package>
 node .claude/skills/playwright-test-engineer/scripts/check-fixture-wiring.js <package>
 node .claude/skills/playwright-test-engineer/scripts/check-playwright-config.js <package>
+node .claude/skills/playwright-test-engineer/scripts/build-coverage-map.js <package>
+node .claude/skills/playwright-test-engineer/scripts/audit-screenshots.js <package>
 ```
 
 Then work through `references/evaluation-checklist.md` against every spec and fixture in the package, and produce a report with exactly these sections:
 
-1. **Coverage map** — source features/files vs. the specs that exercise them; explicitly list what is uncovered.
+1. **Coverage map** — start from `build-coverage-map.js`'s `storiesLikelyUncovered`/`featuresLikelyUncovered` (read its `disclaimer` field for which list is trustworthy and which is a rough lead) and verify each candidate by actually reading the relevant spec before reporting it as a real gap; explicitly list what is uncovered.
 2. **Test quality** — start from `check-spec-conventions.js`'s findings (naming, `waitForTimeout`, raw selectors, screenshot naming, screenshot-only tests) and add your own read on assertion strength and missing error-state coverage. Don't re-derive by eye what the script already found mechanically — cite its findings, then add the judgment layer (why it matters, how bad it is here).
-3. **Fixture & config hygiene** — start from `check-fixture-wiring.js`'s `undeclaredUsages` (a hard problem — a spec using a fixture that doesn't exist) and `orphanedFixtureFiles` (a lead to check, since legitimate cross-package/composed usage can look orphaned), plus `check-playwright-config.js`'s findings (missing base merge, redeclared base-owned keys). Add your own read on anything those don't cover, e.g. duplicated setup logic across spec files that should be a shared fixture.
+3. **Fixture & config hygiene** — start from `check-fixture-wiring.js`'s `undeclaredUsages` (a hard problem — a spec using a fixture that doesn't exist) and `orphanedFixtureFiles` (a lead to check, since legitimate cross-package/composed usage can look orphaned), plus `check-playwright-config.js`'s findings (missing base merge, redeclared base-owned keys) and `audit-screenshots.js`'s `orphanedBaselines` (dead screenshot files worth cleaning up — verify the scenario was actually removed, not renamed, before deleting). Add your own read on anything those don't cover, e.g. duplicated setup logic across spec files that should be a shared fixture.
 4. **Flakiness risk** — tests likely to flake and _why_ (position-based clicks, screenshot diffs across browsers, race-prone waits, order dependence). This section is judgment — the scripts don't run tests repeatedly to detect actual flakiness, they only flag static anti-patterns that correlate with it.
-5. **Missing scenarios** — important untested scenarios derived from the source analysis.
+5. **Missing scenarios** — start from `build-coverage-map.js`'s uncovered lists (same caveats as §1) and derive further from the Step 2 source analysis; tie each to a real file path.
 6. **Recommendations** — prioritised (high/medium/low), each actionable and tied to a specific file.
 
 Present the report, then ask ⛔ whether the user wants to switch to Mode 1 to act on any finding. If yes, re-enter Mode 1 at Step 5a with the chosen findings as the scenario seed list (the package analysis from Step 2 carries over). Take no further action without that confirmation.
