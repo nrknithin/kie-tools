@@ -21,12 +21,14 @@
  * Neither signal is proof of behavioral coverage. Treat "uncovered" as a categorized starting
  * list to verify by reading the actual specs — not as the final word on what's covered.
  *
- * Usage: node build-coverage-map.js <package-folder-name-or-path>
+ * Usage: node build-coverage-map.js <package-folder-name-or-path> [--cache]
+ *   --cache   also write this report to a deterministic temp path for reuse later in the same
+ *             session (see inspect-package.js's --cache for the same mechanism).
  */
 
 const fs = require("fs");
 const path = require("path");
-const { resolveRepoRoot, walkFiles, resolvePackageDir } = require("./lib/workspace");
+const { resolveRepoRoot, walkFiles, resolvePackageDir, writeAnalysisCache } = require("./lib/workspace");
 
 const EXCLUDE_SRC_SUFFIXES = [".test.ts", ".test.tsx", ".spec.ts", ".spec.tsx", ".d.ts", ".stories.tsx", ".stories.ts"];
 const EXCLUDE_SRC_BASENAMES = new Set(["index.ts", "index.tsx"]);
@@ -191,6 +193,11 @@ function main() {
     `\n${featuresUnmentioned.length}/${features.length} src feature(s) have no name-match in tests-e2e/ — review these first. ` +
       `${storiesUnmentioned.length}/${stories.length} storybook stor(y/ies) likewise.`
   );
+
+  if (process.argv.includes("--cache")) {
+    const cachePath = writeAnalysisCache(path.basename(pkgDir), "build-coverage-map", report);
+    console.error(`Cached to ${cachePath} for reuse later in this session.`);
+  }
 }
 
 main();

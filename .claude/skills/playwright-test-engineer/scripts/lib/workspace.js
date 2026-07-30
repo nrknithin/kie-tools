@@ -7,6 +7,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const os = require("os");
 const { builtinModules } = require("module");
 
 const NODE_BUILTIN_MODULE_NAMES = new Set(builtinModules);
@@ -310,6 +311,26 @@ function bareSpecifierPackageName(specifier) {
   return specifier.split("/")[0];
 }
 
+/**
+ * Deterministic cache path for a package's analysis output, so a Step 2 analysis (inspect-package.js,
+ * build-coverage-map.js) can be re-read later in the same session — e.g. a Mode 2 -> Mode 1
+ * hand-off after the original tool output has scrolled out of context — instead of re-running
+ * the analysis from scratch. Same path every time for a given (package, script) pair, so a
+ * later run naturally overwrites/refreshes it rather than accumulating stale files.
+ */
+function analysisCachePath(pkgFolderName, scriptName) {
+  const dir = path.join(os.tmpdir(), "playwright-test-engineer-cache");
+  return path.join(dir, `${pkgFolderName}--${scriptName}.json`);
+}
+
+/** Write `data` (already a plain object) as JSON to the deterministic cache path, creating the cache dir if needed. */
+function writeAnalysisCache(pkgFolderName, scriptName, data) {
+  const cachePath = analysisCachePath(pkgFolderName, scriptName);
+  fs.mkdirSync(path.dirname(cachePath), { recursive: true });
+  fs.writeFileSync(cachePath, JSON.stringify(data, null, 2));
+  return cachePath;
+}
+
 module.exports = {
   findRepoRoot,
   resolveRepoRoot,
@@ -331,4 +352,6 @@ module.exports = {
   PLAYWRIGHT_BUILTIN_FIXTURES,
   stripShebang,
   resolvePackageDir,
+  analysisCachePath,
+  writeAnalysisCache,
 };

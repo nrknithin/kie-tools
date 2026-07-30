@@ -8,7 +8,11 @@
  * something the model free-recalls or re-derives by skimming — it should read this instead,
  * then apply judgment on top (what a feature *means*, whether coverage is *adequate*, etc.).
  *
- * Usage: node inspect-package.js <package-folder-name-or-path>
+ * Usage: node inspect-package.js <package-folder-name-or-path> [--cache]
+ *   --cache   also write this report to a deterministic temp path (see lib/workspace.js's
+ *             analysisCachePath) so it can be re-read later in the same session — e.g. a
+ *             Mode 2 -> Mode 1 hand-off after this output has scrolled out of context —
+ *             instead of re-running the analysis from scratch.
  */
 
 const fs = require("fs");
@@ -22,6 +26,7 @@ const {
   resolveWorkspaceImport,
   buildNameMap,
   resolvePackageDir,
+  writeAnalysisCache,
 } = require("./lib/workspace");
 
 function inspectPackageJson(pkgDir) {
@@ -139,6 +144,11 @@ function main() {
   };
 
   console.log(JSON.stringify(report, null, 2));
+
+  if (process.argv.includes("--cache")) {
+    const cachePath = writeAnalysisCache(path.basename(pkgDir), "inspect-package", report);
+    console.error(`\nCached to ${cachePath} for reuse later in this session.`);
+  }
 }
 
 main();

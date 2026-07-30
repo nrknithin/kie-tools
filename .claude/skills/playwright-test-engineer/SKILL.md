@@ -26,7 +26,7 @@ Other hard constraints, active during every step:
 `scripts/` (Node.js, zero npm dependencies, no shell scripts — runs the same on Windows/macOS/Linux) contains deterministic checks that back the hard constraints above. They exist because self-assessment of things like "is this import real" or "does this path exist" is exactly the kind of claim a model can get wrong with full confidence — a script that actually reads the filesystem cannot. Treat every 🔧 marker below as **required**, not optional:
 
 - `scripts/list-target-packages.js` — Step 1's package list and existence check.
-- `scripts/inspect-package.js <package>` — Step 2's factual backbone: `package.json` scripts/deps, `playwright.config.ts` shape, `tests-e2e/` inventory (spec/fixture/screenshot counts, feature-group folders), and every cross-package workspace import actually found in `tests-e2e/`. Run this instead of manually reading and summarizing those files by eye.
+- `scripts/inspect-package.js <package> [--cache]` — Step 2's factual backbone: `package.json` scripts/deps, `playwright.config.ts` shape, `tests-e2e/` inventory (spec/fixture/screenshot counts, feature-group folders), and every cross-package workspace import actually found in `tests-e2e/`. Run this instead of manually reading and summarizing those files by eye. `--cache` also persists the JSON to a deterministic temp path for later reuse (e.g. a Mode 2 → Mode 1 hand-off).
 - `scripts/scaffold-package-e2e.js <package> [--served-app] [--port <PORT>]` — bootstraps `env/index.js`/`playwright.config.ts`/`tests-e2e/__fixtures__/base.ts` plus additive `package.json` script/devDependency additions for a package that has no Playwright yet. Use this at Step 1 instead of re-synthesizing ~150 lines of config from memory.
 - `scripts/scaffold-spec.js <package> <relPath.spec.ts> [--force]` — generates a new spec file with the correct license header and `../__fixtures__/base` import depth already computed. Use this at Step 7a instead of hand-copying `assets/spec-template.ts` and counting directories.
 - `scripts/check-imports.js <files...>` — resolves every import against real files/declared deps. This is constraint #3, mechanically enforced.
@@ -35,7 +35,7 @@ Other hard constraints, active during every step:
 - `scripts/check-playwright-config.js <package>` — verifies the config actually merges `@kie-tools/playwright-base/playwright.config` and flags redeclared base-owned keys (constraint #4's "config inheritance", mechanically enforced instead of eyeballed).
 - `scripts/check-env-usage.js <package>` — cross-references every custom key `env/index.js` defines against the rest of the package (both TypeScript `buildEnv.<path>` usage and `$(build-env <path>)` shell usage in `package.json` scripts), flagging likely-dead copy-pasted config.
 - `scripts/check-spec-conventions.js <package>` — naming, anti-patterns (`waitForTimeout`, raw selectors — checked in both specs and `__fixtures__/`), screenshot naming/coverage heuristics.
-- `scripts/build-coverage-map.js <package>` — cross-references `src/`/`stories/` against `tests-e2e/` (strong signal for Storybook story ids, weak naive-match for `src/` filenames — read its `disclaimer` field). This is Step 2/Mode 2's biggest token-savings script for a large package.
+- `scripts/build-coverage-map.js <package> [--cache]` — cross-references `src/`/`stories/` against `tests-e2e/` (strong signal for Storybook story ids, weak naive-match for `src/` filenames — read its `disclaimer` field). This is Step 2/Mode 2's biggest token-savings script for a large package. `--cache` persists it the same way `inspect-package.js` does.
 - `scripts/audit-screenshots.js <package>` — orphaned `__screenshots__/*.png` baselines with no matching `toHaveScreenshot(...)` call, and the reverse (referenced names with no baseline yet).
 - `scripts/verify-plan-paths.js <plan.md> <package>` — every `**Covers**:`/`**File**:`/`**Fixtures/utilities used**:` path in a plan is checked against the real filesystem.
 - `scripts/verify-e2e-discovery.js <package>` — hands specs to Playwright's own `test --list` loader (needs `pnpm install` done first); the strongest check available, since it's the same resolution path CI uses, not an approximation of it.
@@ -80,7 +80,7 @@ Exit 0 means it resolved to a real package (the JSON tells you its group and whe
 Analyse without narrating every file read. 🔧 Get the mechanical facts from a script first, then add the judgment layer on top — don't re-derive by eye what's already a filesystem fact:
 
 ```bash
-node .claude/skills/playwright-test-engineer/scripts/inspect-package.js <package>
+node .claude/skills/playwright-test-engineer/scripts/inspect-package.js <package> --cache
 ```
 
 This gives you: `package.json` purpose/deps/`test-e2e*` scripts; the `playwright.config.ts` shape (does it merge the shared base, what's the baseURL, is it storybook-driven or a served app); `tests-e2e/` inventory (spec/fixture/screenshot counts, top-level feature-group folder names, whether containerization exists); and every _other_ workspace package this package's tests actually import from (real cross-package fixture/utility reuse, not guessed from memory).
@@ -88,10 +88,12 @@ This gives you: `package.json` purpose/deps/`test-e2e*` scripts; the `playwright
 🔧 Then, instead of manually walking `src/`/`stories/` against every spec by eye (the single biggest token sink in this skill for a large package — dmn-editor alone is 77 specs against ~300 src files), run:
 
 ```bash
-node .claude/skills/playwright-test-engineer/scripts/build-coverage-map.js <package>
+node .claude/skills/playwright-test-engineer/scripts/build-coverage-map.js <package> --cache
 ```
 
 Read its `disclaimer` field before trusting the output: the `storiesLikely*` result matches on the exact Storybook story id a spec navigates to (`iframe.html?id=<this>`) and is a strong signal; the `featuresLikely*` result is a much weaker naive filename match and will show a high "uncovered" rate that does **not** mean untested (E2E specs interact through the rendered UI, not by importing `src/` modules by name) — use it only as a rough starting point to skim, never as a coverage verdict on its own.
+
+Always pass `--cache` on these two at Step 2 — it writes the JSON to a deterministic temp path (`lib/workspace.js`'s `analysisCachePath`, same path every time for a given package) alongside printing it, at no extra cost. If a long conversation later needs this analysis again (most importantly the Mode 2 → Mode 1 hand-off below) and the original tool output has scrolled out of context, re-read that cached file instead of re-running the analysis from scratch.
 
 On top of that factual base, still do the part that's genuinely judgment:
 
@@ -173,7 +175,7 @@ Then work through `references/evaluation-checklist.md` against every spec and fi
 5. **Missing scenarios** — start from `build-coverage-map.js`'s uncovered lists (same caveats as §1) and derive further from the Step 2 source analysis; tie each to a real file path.
 6. **Recommendations** — prioritised (high/medium/low), each actionable and tied to a specific file.
 
-Present the report, then ask ⛔ whether the user wants to switch to Mode 1 to act on any finding. If yes, re-enter Mode 1 at Step 5a with the chosen findings as the scenario seed list (the package analysis from Step 2 carries over). Take no further action without that confirmation.
+Present the report, then ask ⛔ whether the user wants to switch to Mode 1 to act on any finding. If yes, re-enter Mode 1 at Step 5a with the chosen findings as the scenario seed list. The package analysis from Step 2 carries over — if it's scrolled out of context, re-read the cached files at `os.tmpdir()/playwright-test-engineer-cache/<package>--inspect-package.json` and `<package>--build-coverage-map.json` (written if you passed `--cache` at Step 2) instead of re-running the analysis scripts from scratch. Take no further action without that confirmation.
 
 ---
 
