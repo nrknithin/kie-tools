@@ -21,7 +21,7 @@ Work file-by-file through the package's `tests-e2e/` directory. This checklist b
 
 ## 3. Fixture & config hygiene
 
-- Confirm `playwright.config.ts` still merges `@kie-tools/playwright-base/playwright.config` via `lodash/merge` rather than redefining shared options (projects, reporters, retries) locally — local redefinition drifts from the shared base silently.
+- Run `scripts/check-playwright-config.js <package>` — it mechanically confirms `playwright.config.ts` merges `@kie-tools/playwright-base/playwright.config` via `lodash/merge` and flags any locally-redeclared base-owned option (projects, reporters, retries, `testDir`, `expect`, ...), which drifts from the shared base silently otherwise. Cite its findings rather than eyeballing the config file.
 - Confirm new fixtures were added to `__fixtures__/base.ts`'s `test.extend` rather than instantiated ad hoc inside spec files.
 - Check for duplicated setup logic across multiple spec files that should be a `test.beforeEach` in a shared fixture or a helper method instead.
 - Check `env/index.js` — are build-env keys actually used by the config, or is there dead config left over from a copy-paste of another package's setup?

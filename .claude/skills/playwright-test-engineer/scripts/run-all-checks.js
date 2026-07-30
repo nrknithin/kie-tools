@@ -91,6 +91,10 @@ function main() {
   report.checks.fixtureWiring = fixtures.parsed || { error: fixtures.stderr };
   if (fixtures.status !== 0) blocking = true;
 
+  const config = runNode("check-playwright-config.js", [pkgDir]);
+  report.checks.playwrightConfig = config.parsed || { error: config.stderr };
+  if (config.status !== 0) blocking = true;
+
   const conventions = runNode("check-spec-conventions.js", [pkgDir]);
   report.checks.specConventions = conventions.parsed || { error: conventions.stderr };
   if (conventions.status !== 0) blocking = true;
