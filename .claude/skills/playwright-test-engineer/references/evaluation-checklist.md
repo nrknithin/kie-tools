@@ -24,7 +24,7 @@ Work file-by-file through the package's `tests-e2e/` directory. This checklist b
 - Run `scripts/check-playwright-config.js <package>` — it mechanically confirms `playwright.config.ts` merges `@kie-tools/playwright-base/playwright.config` via `lodash/merge` and flags any locally-redeclared base-owned option (projects, reporters, retries, `testDir`, `expect`, ...), which drifts from the shared base silently otherwise. Cite its findings rather than eyeballing the config file.
 - Confirm new fixtures were added to `__fixtures__/base.ts`'s `test.extend` rather than instantiated ad hoc inside spec files.
 - Check for duplicated setup logic across multiple spec files that should be a `test.beforeEach` in a shared fixture or a helper method instead.
-- Check `env/index.js` — are build-env keys actually used by the config, or is there dead config left over from a copy-paste of another package's setup?
+- Run `scripts/check-env-usage.js <package>` — mechanically cross-references every custom key `env/index.js` defines against every other file in the package (both `buildEnv.<path>` TypeScript usage and `$(build-env <path>)` shell usage in `package.json` scripts). Its `possiblyDead` list is a heuristic lead (a key could be consumed by a sibling package or a non-literal access pattern) — verify with a repo-wide search before calling it dead in the report.
 
 ## 4. Flakiness risk
 
