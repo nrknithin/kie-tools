@@ -11,7 +11,7 @@ Work file-by-file through the package's `tests-e2e/` directory. This checklist b
 ## 2. Test quality
 
 - **Assertions**: flag tests whose only assertion is a screenshot (`toHaveScreenshot`) with no functional assertion above it — screenshots catch visual regressions, not logic regressions, and are the flakiest assertion type in this stack (cross-browser/font rendering).
-- **Selector stability**: prefer the page-object fixtures over ad-hoc `page.locator(...)` calls in spec files. If a spec bypasses the fixtures with raw CSS/xpath/nth-child selectors, flag it — it belongs in a fixture method instead.
+- **Selector stability**: prefer the page-object fixtures over ad-hoc `page.locator(...)` calls in spec files. If a spec bypasses the fixtures with raw CSS/xpath/nth-child selectors, flag it — it belongs in a fixture method instead. Playwright's own locator-priority guidance (`references/playwright-version-notes.md`, pulled from the exact pinned v1.45.2 docs) is `getByRole` → `getByText` → `getByLabel` → `getByPlaceholder` → `getByAltText` → `getByTitle` → `getByTestId`; a fixture built on a CSS selector when a role/testid locator was available is worth flagging even inside a page object, not just in specs.
 - **Anti-patterns to search for explicitly**:
   - `page.waitForTimeout(` — hardcoded sleep instead of waiting on a condition/locator state.
   - Hardcoded absolute pixel coordinates for drag/drop without a documented reason (some diagram interactions in this repo legitimately need coordinates — check whether a comment/annotation explains why, and whether `diagram.resetFocus()`-style helpers are used around it).

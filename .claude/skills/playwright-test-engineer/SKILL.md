@@ -7,6 +7,8 @@ description: Create, update, or evaluate Playwright end-to-end tests for package
 
 You are acting as a Playwright test engineer for THIS monorepo only. Everything you create must fit the conventions the repo already uses — they are documented in `references/repo-conventions.md` (read it before writing any test file or evaluating any test). Never invent new patterns when an existing one exists.
 
+Every package here pins the exact same Playwright version (`@playwright/test@1.45.2`, per `references/playwright-version-notes.md`) — noticeably older than whatever playwright.dev's live docs describe today. If you need to check an API detail and it matters whether it's actually available in this version, read that reference file first; it explains why and links the version-pinned source instead of the always-latest live docs.
+
 ## Scope guard — enforce before anything else
 
 This skill operates strictly inside this pnpm monorepo (the repo root containing `pnpm-workspace.yaml`, `packages/`, and `examples/`). If the user asks for Playwright work on a project outside this repo, a generic Playwright tutorial, or tests for code that does not live here, politely refuse and redirect: explain this skill is scoped to this monorepo and offer to help with a package inside it instead. Never create, reference, or suggest files outside the repo root.
@@ -71,6 +73,8 @@ This gives you: `package.json` purpose/deps/`test-e2e*` scripts; the `playwright
 On top of that factual base, still do the part that's genuinely judgment:
 - Map `src/` at feature level (top-level modules/components, storybook stories if the package is storybook-driven) to know what exists vs. what the specs touch — this requires understanding what the code *does*, which the script can't tell you.
 
+If this session has a Playwright MCP server connected (tools like `browser_navigate`/`browser_snapshot` — check what's actually available, don't assume), you can optionally start the package's dev server and navigate to the real storybook story/app route to ground your understanding in the live accessibility tree instead of inferring it from JSX. See `references/playwright-version-notes.md` for how this helps and its limits. This is a nice-to-have, not a requirement — proceed with static analysis if it's not available.
+
 ### Step 3 — Mode selection
 
 Present a short summary of what you found (test count, fixture inventory, rough coverage impression, how tests are run) and ask: **create/update tests** or **evaluate existing tests**? Wait for the answer.
@@ -109,6 +113,7 @@ Only after plan confirmation:
 
 - Implement every confirmed scenario. Follow `references/repo-conventions.md` exactly: correct license header for the package's workspace group (`assets/.apache-header` for `packages/`, `examples/`, `scripts/`; `assets/.ibm-header` for `packages-bamoe/`, `packages-bamoe-artifacts/`), `tests-e2e/<featureGroup>/<camelCaseName>.spec.ts` naming, `import { test, expect } from "../__fixtures__/base"`, page-object fixtures, `TestAnnotations` for regression/workaround links, `toHaveScreenshot("kebab-case-name.png")` for visual assertions.
 - Reuse existing fixtures and the merged base config; never duplicate infrastructure. New page objects go in `__fixtures__/` and get wired into `base.ts` via `test.extend`.
+- Locator priority follows Playwright's own v1.45.2 guidance (`references/playwright-version-notes.md`): `getByRole` → `getByText` → `getByLabel` → `getByPlaceholder` → `getByAltText` → `getByTitle` → `getByTestId`, in that order — avoid raw CSS/XPath. If a Playwright MCP server is connected, use its live accessibility snapshot to confirm a selector actually matches before writing it, rather than assuming from JSX.
 - 🔧 Before presenting anything as done, run:
   ```bash
   node .claude/skills/playwright-test-engineer/scripts/run-all-checks.js <package>
@@ -147,6 +152,7 @@ Present the report, then ask ⛔ whether the user wants to switch to Mode 1 to a
 ## Bundled resources
 
 - `references/repo-conventions.md` — the discovered, verified Playwright conventions of this monorepo (config inheritance, fixture pattern, naming, scripts, env vars, containerization). **Read before writing or judging any test.**
+- `references/playwright-version-notes.md` — the exact pinned Playwright version (1.45.2), version-accurate locator/best-practice guidance fetched from that release's own docs (not today's playwright.dev), the Component Testing status (exists, experimental, unused here), and how to use a Playwright MCP server if one is connected.
 - `references/evaluation-checklist.md` — the concrete checklist behind the Mode 2 report.
 - `assets/.apache-header` / `assets/.ibm-header` — the exact license headers for the upstream (ASF) and downstream-only (`packages-bamoe`/`packages-bamoe-artifacts`) workspace groups respectively. `.ibm-header` is a placeholder until the real text is pasted in — `scripts/check-license-header.js` reports files needing it as "unconfigured", never as a false pass.
 - `assets/spec-template.ts` — a skeleton spec file matching repo conventions.
